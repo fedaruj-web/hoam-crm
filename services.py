@@ -6,6 +6,7 @@ import unicodedata
 from pathlib import Path
 
 import pandas as pd
+import streamlit as st
 
 from database import (
     LEAD_STATUSES,
@@ -98,6 +99,7 @@ def parse_date(value, fallback=None):
         return fallback or date.today()
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def leads_df():
     leads = get_leads()
     if not leads:
@@ -170,6 +172,7 @@ def funnel_summary(df=None):
     return grouped
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def followups_df():
     df = leads_df()
     if df.empty or "next_followup_date" not in df.columns:
@@ -309,11 +312,13 @@ def categorize_lead(row):
     return {"category": "A qualificar", "priority": "A qualificar", "probability": 10}
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def activity_history_df(lead_id=None):
     data = get_activities(lead_id=lead_id)
     return pd.DataFrame(data) if data else pd.DataFrame()
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def opportunities_df(lead_id=None):
     data = get_opportunities(lead_id=lead_id)
     if not data:
@@ -323,6 +328,7 @@ def opportunities_df(lead_id=None):
     return df
 
 
+@st.cache_data(ttl=60, show_spinner=False)
 def clients_df():
     data = get_clients()
     if not data:
@@ -332,6 +338,7 @@ def clients_df():
     return df
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def proposals_df(lead_id=None):
     data = get_proposals(lead_id=lead_id)
     if not data:

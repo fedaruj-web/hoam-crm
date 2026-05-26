@@ -401,7 +401,16 @@ def _execute_write(sql, params=()):
     else:
         lastrowid = cur.lastrowid
     conn.close()
+    _clear_streamlit_caches()
     return lastrowid
+
+
+def _clear_streamlit_caches():
+    try:
+        import streamlit as st
+        st.cache_data.clear()
+    except Exception:
+        pass
 
 
 def add_user(data):
@@ -566,6 +575,7 @@ def merge_leads(master_id, duplicate_id):
     conn.execute(_sql("DELETE FROM leads WHERE id=?"), (duplicate_id,))
     conn.commit()
     conn.close()
+    _clear_streamlit_caches()
     return master_id
 
 
@@ -700,6 +710,7 @@ def upsert_client_from_lead(lead_id):
     ))
     conn.commit()
     conn.close()
+    _clear_streamlit_caches()
     return lead_id
 
 

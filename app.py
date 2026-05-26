@@ -20,7 +20,15 @@ from services import allowed_menus
 from ui.styles import apply_theme, render_sidebar_brand
 
 st.set_page_config(page_title="Hoam Capital CRM", page_icon="H", layout="wide")
-init_db()
+
+
+@st.cache_resource(show_spinner=False)
+def bootstrap_database():
+    init_db()
+    return True
+
+
+bootstrap_database()
 apply_theme()
 
 if "user" not in st.session_state:
