@@ -1,0 +1,4 @@
+streamlit
+pandas
+openpyxl
+psycopg[binary]; python_version < "3.14"

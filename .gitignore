@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.err
+*.csv
+.venv/
+.env
+.streamlit/secrets.toml
