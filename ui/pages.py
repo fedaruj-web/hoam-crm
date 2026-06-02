@@ -1,4 +1,6 @@
 from datetime import date, timedelta
+from html import escape
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -30,10 +32,14 @@ from database import (
     get_service,
     get_service_price,
     get_service_prices,
+    get_service_templates,
+    get_proposal_services,
     get_user,
     get_users,
+    set_proposal_services,
     update_lead,
     update_proposal,
+    update_proposal_status,
     update_service,
     update_service_price,
     update_user,
@@ -391,12 +397,8 @@ def render_opportunities():
 
 
 def render_proposals(current_user):
-    header("Propostas", "Controle de propostas comerciais, status, validade e valores negociados.")
+    header("Propostas", "Proposta comercial e termo de adesao com selecao modular de servicos.")
     leads = get_leads()
-    if not leads:
-        st.info("Cadastre um lead antes de criar propostas.")
-        return
-
     df = proposals_df()
     metrics = proposal_metrics(df)
     c1, c2, c3, c4 = st.columns(4)
@@ -409,32 +411,296 @@ def render_proposals(current_user):
     with c4:
         metric_card("Valor aprovado", money(metrics["approved_value"]), "propostas aprovadas")
 
-    tab_new, tab_list = st.tabs(["Nova proposta", "Base de propostas"])
+    tab_new, tab_list = st.tabs(["Nova Proposta", "Propostas Geradas"])
     with tab_new:
-        _render_proposal_form(leads, current_user)
+        _render_commercial_proposal_form(leads, current_user)
     with tab_list:
-        if df.empty:
-            st.info("Nenhuma proposta cadastrada.")
+        _render_generated_proposals(df)
+
+
+def _render_commercial_proposal_form(leads, current_user):
+    templates = get_service_templates(active_only=True)
+    if not templates:
+        st.info("Nenhum template de servico ativo cadastrado.")
+        return
+
+    source = st.radio("Cliente", ["Lead existente", "Cliente manual"], horizontal=True)
+    selected_lead = None
+    lead_id = None
+    if source == "Lead existente":
+        if not leads:
+            st.info("Cadastre um lead ou use cliente manual.")
+        else:
+            lead_options = {f"{lead['id']} - {lead['company_name']}": lead for lead in leads}
+            selected_label = st.selectbox("Lead", list(lead_options.keys()))
+            selected_lead = lead_options[selected_label]
+            lead_id = selected_lead["id"]
+
+    defaults = _client_defaults_from_lead(selected_lead)
+    c1, c2 = st.columns(2)
+    client_name = c1.text_input("Cliente / Razao social *", value=defaults["client_name"])
+    client_document = c2.text_input("Documento / CNPJ", value=defaults["client_document"])
+    client_contact = c1.text_input("Contato", value=defaults["client_contact"])
+    client_email = c2.text_input("E-mail", value=defaults["client_email"])
+
+    c1, c2, c3 = st.columns(3)
+    proposal_date = c1.date_input("Data da proposta", value=date.today())
+    validity_days = int(c2.number_input("Validade (dias)", min_value=1, value=15, step=1))
+    users = users_options()
+    default_owner = current_user.get("name") or "Fernando Daruj"
+    responsible_label = c3.selectbox("Responsavel comercial", list(users.keys()), index=_index_or_zero(list(users.keys()), default_owner))
+
+    st.markdown("#### Servicos contratados")
+    selected_services = []
+    template_df = pd.DataFrame(templates)
+    for category in sorted(template_df["category"].fillna("Outros").unique()):
+        category_templates = template_df[template_df["category"].fillna("Outros") == category]
+        with st.expander(category, expanded=True):
+            for item in category_templates.to_dict("records"):
+                checked = st.checkbox(item["name"], key=f"term_service_{item['id']}")
+                st.caption(item.get("short_description") or "")
+                if checked:
+                    c1, c2 = st.columns([2, 1])
+                    custom_description = c1.text_area(
+                        "Descricao customizada",
+                        value=item.get("full_scope") or item.get("short_description") or "",
+                        key=f"term_desc_{item['id']}",
+                    )
+                    custom_price = c2.number_input(
+                        "Preco",
+                        min_value=0.0,
+                        value=float(item.get("default_price") or 0),
+                        step=500.0,
+                        key=f"term_price_{item['id']}",
+                    )
+                    selected_services.append({
+                        "service_template_id": int(item["id"]),
+                        "custom_description": custom_description.strip(),
+                        "custom_price": custom_price,
+                    })
+
+    st.markdown("#### Condicoes comerciais")
+    c1, c2, c3 = st.columns(3)
+    initial_fee = c1.number_input("Fee inicial", min_value=0.0, value=0.0, step=1000.0)
+    monthly_default = float(sum(item["custom_price"] for item in selected_services))
+    monthly_fee = c2.number_input("Fee recorrente mensal", min_value=0.0, value=monthly_default, step=1000.0)
+    success_fee = c3.number_input("Success fee (%)", min_value=0.0, value=0.0, step=1.0)
+    payment_terms = st.text_area("Condicoes de pagamento", value="Fee mensal pago ate o 5o dia util de cada mes, salvo condicao especifica negociada entre as partes.")
+    reimbursement_terms = st.text_area("Reembolso de despesas", value="Despesas extraordinarias, deslocamentos, taxas de terceiros e custos externos serao previamente aprovados e reembolsados pelo Cliente.")
+    notes = st.text_area("Observacoes internas / comerciais")
+
+    if st.button("Salvar proposta", type="primary"):
+        if not client_name.strip():
+            st.error("Informe o nome do cliente.")
             return
-        status_filter = st.selectbox("Status", ["Todos"] + PROPOSAL_STATUSES)
-        view = df if status_filter == "Todos" else df[df["status"] == status_filter]
-        st.dataframe(
-            view[[
-                "id", "company_name", "title", "catalog_service_name", "service_type", "status", "owner_name",
-                "price_quantity_fmt", "setup_fee_fmt", "recurring_fee_fmt", "estimated_total_fmt", "valid_until", "sent_at", "approved_at",
-            ]].rename(columns={"catalog_service_name": "service_catalogo"}),
-            use_container_width=True,
-            hide_index=True,
-        )
-        if not view.empty:
-            selected = st.selectbox(
-                "Editar proposta",
-                view["id"].tolist(),
-                format_func=lambda pid: f"{pid} - {view.loc[view['id'] == pid, 'title'].iloc[0]}",
-            )
-            proposal = get_proposal(int(selected))
-            if proposal:
-                _render_proposal_edit_form(proposal, leads, current_user)
+        if not selected_services:
+            st.error("Selecione pelo menos um servico.")
+            return
+        if lead_id is None:
+            lead_id = add_lead({
+                "company_name": client_name.strip(),
+                "contact_name": client_contact.strip(),
+                "email": client_email.strip(),
+                "phone": "",
+                "source": "Outro",
+                "status": "Novo lead",
+                "owner_id": users[responsible_label],
+                "notes": "Lead criado automaticamente a partir de proposta manual.",
+            })
+        proposal_id = add_proposal({
+            "lead_id": lead_id,
+            "owner_id": users[responsible_label],
+            "title": "Proposta Comercial e Termo de Adesao",
+            "service_type": "Termo de adesao",
+            "status": "Rascunho",
+            "setup_fee": initial_fee,
+            "recurring_fee": monthly_fee,
+            "estimated_total": initial_fee + monthly_fee,
+            "valid_until": str(proposal_date + timedelta(days=validity_days)),
+            "notes": notes.strip(),
+            "client_name": client_name.strip(),
+            "client_document": client_document.strip(),
+            "client_contact": client_contact.strip(),
+            "client_email": client_email.strip(),
+            "proposal_date": str(proposal_date),
+            "validity_days": validity_days,
+            "responsible": responsible_label,
+            "initial_fee": initial_fee,
+            "monthly_fee": monthly_fee,
+            "success_fee": success_fee,
+            "payment_terms": payment_terms.strip(),
+            "reimbursement_terms": reimbursement_terms.strip(),
+        })
+        set_proposal_services(proposal_id, selected_services)
+        st.success("Proposta salva.")
+        st.rerun()
+
+
+def _render_generated_proposals(df):
+    if df.empty:
+        st.info("Nenhuma proposta cadastrada.")
+        return
+
+    c1, c2, c3 = st.columns(3)
+    client_filter = c1.text_input("Filtrar por cliente")
+    status_filter = c2.selectbox("Status", ["Todos"] + PROPOSAL_STATUSES)
+    owner_values = sorted([value for value in df.get("responsible", pd.Series(dtype=str)).fillna("").unique() if value])
+    owner_filter = c3.selectbox("Responsavel", ["Todos"] + owner_values)
+
+    view = df.copy()
+    if client_filter:
+        name_col = view["client_name"].fillna(view["company_name"].fillna(""))
+        view = view[name_col.str.contains(client_filter, case=False, na=False)]
+    if status_filter != "Todos":
+        view = view[view["status"] == status_filter]
+    if owner_filter != "Todos":
+        view = view[view["responsible"].fillna("") == owner_filter]
+
+    table = view.copy()
+    if "client_name" in table.columns:
+        table["cliente"] = table["client_name"].fillna("").where(table["client_name"].fillna("") != "", table["company_name"])
+    st.dataframe(
+        table[["id", "cliente", "status", "responsible", "proposal_date", "valid_until", "initial_fee_fmt", "monthly_fee_fmt", "success_fee_fmt"]],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    if view.empty:
+        return
+    selected_id = st.selectbox(
+        "Visualizar proposta",
+        view["id"].tolist(),
+        format_func=lambda pid: f"{pid} - {view.loc[view['id'] == pid, 'client_name'].fillna('').iloc[0] or view.loc[view['id'] == pid, 'company_name'].iloc[0]}",
+    )
+    proposal = get_proposal(int(selected_id))
+    proposal_services = get_proposal_services(int(selected_id))
+    if not proposal:
+        return
+
+    c1, c2 = st.columns([1, 2])
+    new_status = c1.selectbox("Alterar status", PROPOSAL_STATUSES, index=_index_or_zero(PROPOSAL_STATUSES, proposal.get("status")))
+    if c1.button("Salvar status"):
+        update_proposal_status(int(selected_id), new_status)
+        st.success("Status atualizado.")
+        st.rerun()
+
+    html = _proposal_document_html(proposal, proposal_services)
+    c2.download_button(
+        "Baixar HTML",
+        data=html.encode("utf-8"),
+        file_name=f"proposta_hoam_{selected_id}.html",
+        mime="text/html",
+    )
+    if c2.button("Exportar HTML"):
+        path = _export_proposal_html(int(selected_id), html)
+        st.success(f"HTML exportado em {path}")
+
+    st.markdown("#### Visualizacao da proposta")
+    st.components.v1.html(html, height=900, scrolling=True)
+
+
+def _client_defaults_from_lead(lead):
+    if not lead:
+        return {"client_name": "", "client_document": "", "client_contact": "", "client_email": ""}
+    return {
+        "client_name": lead.get("company_name") or "",
+        "client_document": lead.get("cnpj") or "",
+        "client_contact": lead.get("contact_name") or "",
+        "client_email": lead.get("email") or "",
+    }
+
+
+def _export_proposal_html(proposal_id, html):
+    export_dir = Path(__file__).resolve().parents[1] / "exports"
+    export_dir.mkdir(exist_ok=True)
+    path = export_dir / f"proposta_hoam_{proposal_id}.html"
+    path.write_text(html, encoding="utf-8")
+    return path
+
+
+def _proposal_document_html(proposal, proposal_services):
+    client_name = proposal.get("client_name") or proposal.get("company_name") or ""
+    proposal_date = proposal.get("proposal_date") or str(date.today())
+    validity_days = proposal.get("validity_days") or 15
+    valid_until = proposal.get("valid_until") or ""
+    services_html = "".join(_proposal_service_html(item) for item in proposal_services)
+    if not services_html:
+        services_html = "<p>Nenhum servico selecionado.</p>"
+    return f"""
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Proposta Hoam Capital</title>
+<style>
+body {{ margin:0; background:#f7f3ea; color:#171717; font-family:Arial, Helvetica, sans-serif; }}
+.page {{ max-width:980px; margin:0 auto; padding:42px; }}
+.cover {{ background:#050505; color:#fff; border-radius:14px; padding:42px; border:1px solid #b9964d; }}
+.brand {{ color:#d5b46a; font-size:14px; letter-spacing:2px; text-transform:uppercase; font-weight:700; }}
+h1 {{ font-size:34px; line-height:1.15; margin:22px 0 28px; }}
+h2 {{ margin-top:34px; font-size:20px; color:#111; border-bottom:1px solid #d7c9a5; padding-bottom:10px; }}
+.meta {{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; margin-top:26px; }}
+.meta div, .card {{ background:#fffaf0; border:1px solid #e0d4b8; border-radius:10px; padding:16px; }}
+.label {{ color:#8b7a55; font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }}
+.value {{ font-weight:700; }}
+.section {{ background:#fffdf8; border:1px solid #e4dac2; border-radius:12px; padding:24px; margin-top:22px; }}
+.service {{ border-left:4px solid #b9964d; padding:16px; background:#fffaf0; margin:14px 0; border-radius:8px; }}
+.service h3 {{ margin:0 0 8px; }}
+.price {{ color:#111; font-weight:700; margin-top:10px; }}
+.signatures {{ display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:50px; }}
+.line {{ border-top:1px solid #111; padding-top:10px; text-align:center; }}
+p {{ line-height:1.55; }}
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="cover">
+    <div class="brand">Hoam Capital</div>
+    <h1>PROPOSTA COMERCIAL E TERMO DE ADESAO A PRESTACAO DE SERVICOS</h1>
+    <div class="meta">
+      <div><div class="label">Cliente</div><div class="value">{escape(client_name)}</div></div>
+      <div><div class="label">Data</div><div class="value">{escape(str(proposal_date))}</div></div>
+      <div><div class="label">Responsavel</div><div class="value">{escape(str(proposal.get("responsible") or proposal.get("owner_name") or ""))}</div></div>
+      <div><div class="label">Validade</div><div class="value">{escape(str(validity_days))} dias - ate {escape(str(valid_until))}</div></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Dados da contratacao</h2>
+    <div class="meta">
+      <div><div class="label">Documento</div><div class="value">{escape(str(proposal.get("client_document") or ""))}</div></div>
+      <div><div class="label">Contato</div><div class="value">{escape(str(proposal.get("client_contact") or ""))}</div></div>
+      <div><div class="label">E-mail</div><div class="value">{escape(str(proposal.get("client_email") or ""))}</div></div>
+      <div><div class="label">Status</div><div class="value">{escape(str(proposal.get("status") or ""))}</div></div>
+    </div>
+  </section>
+
+  <section class="section"><h2>Apresentacao da Hoam</h2><p>A Hoam Capital atua de forma estrategica na estruturacao, desenvolvimento e viabilizacao de negocios, operacoes e relacionamentos comerciais, oferecendo solucoes personalizadas alinhadas aos objetivos de seus clientes.</p><p>Com abordagem tecnica, visao de mercado e atuacao integrada, a Hoam busca conectar oportunidades, capital, ativos e parceiros estrategicos, agregando inteligencia comercial, governanca e eficiencia a execucao dos projetos.</p></section>
+  <section class="section"><h2>Objetivo da proposta</h2><p>A presente proposta comercial e termo de adesao tem por objetivo apresentar as condicoes para prestacao dos servicos selecionados pelo Cliente, conforme escopo, condicoes comerciais, premissas e aceite previstos neste documento.</p></section>
+  <section class="section"><h2>Servicos selecionados</h2>{services_html}</section>
+  <section class="section"><h2>Condicoes comerciais</h2><div class="meta"><div><div class="label">Fee inicial</div><div class="value">{money(proposal.get("initial_fee") or proposal.get("setup_fee") or 0)}</div></div><div><div class="label">Fee recorrente mensal</div><div class="value">{money(proposal.get("monthly_fee") or proposal.get("recurring_fee") or 0)}</div></div><div><div class="label">Success fee</div><div class="value">{float(proposal.get("success_fee") or 0):.1f}%</div></div><div><div class="label">Pagamento</div><div class="value">{escape(str(proposal.get("payment_terms") or ""))}</div></div></div><p>{escape(str(proposal.get("reimbursement_terms") or ""))}</p></section>
+  <section class="section"><h2>Premissas gerais</h2><p>Os servicos serao prestados de forma consultiva, estrategica, comercial e operacional, sem garantia de resultado, aprovacao regulatoria, captacao de recursos, fechamento de operacoes ou conclusao de negocios especificos.</p><p>A Hoam Capital nao assume obrigacoes financeiras, regulatorias, contabeis, fiduciarias ou de representacao legal do Cliente, salvo se expressamente pactuado em instrumento proprio.</p></section>
+  <section class="section"><h2>Confidencialidade</h2><p>As informacoes compartilhadas entre as partes deverao ser tratadas de forma confidencial, nao podendo ser divulgadas a terceiros sem autorizacao previa, exceto quando exigido por lei, regulacao ou ordem de autoridade competente.</p></section>
+  <section class="section"><h2>Validade</h2><p>Esta proposta e valida por {escape(str(validity_days))} dias contados da data de emissao, salvo prorrogacao formal entre as partes.</p></section>
+  <section class="section"><h2>Aceite</h2><p>Ao assinar ou aprovar eletronicamente este Termo de Adesao, o Cliente declara ter lido, compreendido e aceito os servicos selecionados, as condicoes comerciais e as premissas aqui previstas.</p><div class="signatures"><div class="line">Hoam Capital</div><div class="line">{escape(client_name)}</div></div></section>
+</main>
+</body>
+</html>
+"""
+
+
+def _proposal_service_html(item):
+    description = item.get("custom_description") or item.get("full_scope") or item.get("short_description") or ""
+    return f"""
+    <article class="service">
+      <h3>{escape(str(item.get("name") or "Servico"))}</h3>
+      <p>{escape(str(description))}</p>
+      <p><strong>Entregaveis:</strong> {escape(str(item.get("deliverables") or ""))}</p>
+      <p><strong>Premissas:</strong> {escape(str(item.get("assumptions") or ""))}</p>
+      <p><strong>Exclusoes:</strong> {escape(str(item.get("exclusions") or ""))}</p>
+      <div class="price">Preco: {money(item.get("custom_price") or 0)}</div>
+    </article>
+    """
 
 
 def render_followups():
@@ -1278,6 +1544,18 @@ def _render_proposal_edit_form(proposal, leads, current_user):
                 "sent_at": proposal.get("sent_at") or (str(date.today()) if status in ["Enviada", "Em negociacao", "Aprovada"] else None),
                 "approved_at": proposal.get("approved_at") or (str(date.today()) if status == "Aprovada" else None),
                 "notes": notes.strip(),
+                "client_name": proposal.get("client_name"),
+                "client_document": proposal.get("client_document"),
+                "client_contact": proposal.get("client_contact"),
+                "client_email": proposal.get("client_email"),
+                "proposal_date": proposal.get("proposal_date"),
+                "validity_days": proposal.get("validity_days") or 15,
+                "responsible": proposal.get("responsible"),
+                "initial_fee": proposal.get("initial_fee") or 0,
+                "monthly_fee": proposal.get("monthly_fee") or 0,
+                "success_fee": proposal.get("success_fee") or 0,
+                "payment_terms": proposal.get("payment_terms"),
+                "reimbursement_terms": proposal.get("reimbursement_terms"),
             })
             _sync_lead_after_proposal(lead_id, status, current_user["id"], int(proposal["id"]))
             st.success("Proposta atualizada.")
@@ -1288,6 +1566,7 @@ def _sync_lead_after_proposal(lead_id, proposal_status, user_id, proposal_id):
     status_map = {
         "Enviada": "Proposta enviada",
         "Em negociacao": "Negociacao",
+        "Em negociação": "Negociacao",
         "Aprovada": "Ganho",
         "Recusada": "Perdido",
     }

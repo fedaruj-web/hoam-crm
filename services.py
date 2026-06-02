@@ -376,12 +376,20 @@ def proposals_df(lead_id=None):
     if not data:
         return pd.DataFrame()
     df = pd.DataFrame(data)
-    for col in ["setup_fee", "recurring_fee", "estimated_total", "price_quantity"]:
+    for col in ["setup_fee", "recurring_fee", "estimated_total", "price_quantity", "initial_fee", "monthly_fee", "success_fee"]:
+        if col not in df.columns:
+            df[col] = 0
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    for col in ["client_name", "responsible", "proposal_date"]:
+        if col not in df.columns:
+            df[col] = ""
     df["setup_fee_fmt"] = df["setup_fee"].apply(money)
     df["recurring_fee_fmt"] = df["recurring_fee"].apply(money)
     df["estimated_total_fmt"] = df["estimated_total"].apply(money)
     df["price_quantity_fmt"] = df["price_quantity"].apply(lambda value: f"{float(value):g}")
+    df["initial_fee_fmt"] = df["initial_fee"].apply(money)
+    df["monthly_fee_fmt"] = df["monthly_fee"].apply(money)
+    df["success_fee_fmt"] = df["success_fee"].apply(lambda value: f"{float(value):.1f}%".replace(".", ","))
     return df
 
 
@@ -389,7 +397,7 @@ def proposal_metrics(df=None):
     df = proposals_df() if df is None else df
     if df.empty:
         return {"total": 0, "sent": 0, "approved": 0, "open_value": 0, "approved_value": 0}
-    open_statuses = ["Rascunho", "Enviada", "Em negociacao"]
+    open_statuses = ["Rascunho", "Enviada", "Em negociacao", "Em negociação"]
     return {
         "total": len(df),
         "sent": int(df["status"].isin(["Enviada", "Em negociacao", "Aprovada"]).sum()),
