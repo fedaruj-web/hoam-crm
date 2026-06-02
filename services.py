@@ -376,11 +376,12 @@ def proposals_df(lead_id=None):
     if not data:
         return pd.DataFrame()
     df = pd.DataFrame(data)
-    for col in ["setup_fee", "recurring_fee", "estimated_total"]:
+    for col in ["setup_fee", "recurring_fee", "estimated_total", "price_quantity"]:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
     df["setup_fee_fmt"] = df["setup_fee"].apply(money)
     df["recurring_fee_fmt"] = df["recurring_fee"].apply(money)
     df["estimated_total_fmt"] = df["estimated_total"].apply(money)
+    df["price_quantity_fmt"] = df["price_quantity"].apply(lambda value: f"{float(value):g}")
     return df
 
 

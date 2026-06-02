@@ -37,7 +37,7 @@ TABLES = {
     ],
     "proposals": [
         "id", "lead_id", "owner_id", "service_id", "price_id", "title", "service_type", "status", "setup_fee",
-        "recurring_fee", "estimated_total", "valid_until", "sent_at", "approved_at", "notes",
+        "price_quantity", "recurring_fee", "estimated_total", "valid_until", "sent_at", "approved_at", "notes",
         "created_at", "updated_at",
     ],
 }

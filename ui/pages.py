@@ -421,7 +421,7 @@ def render_proposals(current_user):
         st.dataframe(
             view[[
                 "id", "company_name", "title", "catalog_service_name", "service_type", "status", "owner_name",
-                "setup_fee_fmt", "recurring_fee_fmt", "estimated_total_fmt", "valid_until", "sent_at", "approved_at",
+                "price_quantity_fmt", "setup_fee_fmt", "recurring_fee_fmt", "estimated_total_fmt", "valid_until", "sent_at", "approved_at",
             ]].rename(columns={"catalog_service_name": "service_catalogo"}),
             use_container_width=True,
             hide_index=True,
@@ -592,7 +592,7 @@ def render_reports():
                 proposals = proposals[proposals["status"] == proposal_status]
             proposal_cols = [
                 "id", "company_name", "title", "service_type", "status", "owner_name",
-                "setup_fee_fmt", "recurring_fee_fmt", "estimated_total_fmt", "valid_until",
+                "price_quantity_fmt", "setup_fee_fmt", "recurring_fee_fmt", "estimated_total_fmt", "valid_until",
             ]
             st.dataframe(proposals[proposal_cols], use_container_width=True, hide_index=True)
 
@@ -1127,7 +1127,7 @@ def _render_lead_overview(lead):
         st.caption("Sem propostas registradas.")
     else:
         st.dataframe(
-            proposals[["id", "title", "service_type", "status", "estimated_total_fmt", "valid_until", "owner_name"]],
+            proposals[["id", "title", "service_type", "status", "price_quantity_fmt", "estimated_total_fmt", "valid_until", "owner_name"]],
             use_container_width=True,
             hide_index=True,
         )
@@ -1144,7 +1144,7 @@ def _render_lead_proposals(lead_id, current_user):
         st.info("Nenhuma proposta vinculada a este lead.")
     else:
         st.dataframe(
-            df[["id", "title", "catalog_service_name", "service_type", "status", "setup_fee_fmt", "recurring_fee_fmt", "estimated_total_fmt", "valid_until"]].rename(columns={"catalog_service_name": "service_catalogo"}),
+            df[["id", "title", "catalog_service_name", "service_type", "status", "price_quantity_fmt", "setup_fee_fmt", "recurring_fee_fmt", "estimated_total_fmt", "valid_until"]].rename(columns={"catalog_service_name": "service_catalogo"}),
             use_container_width=True,
             hide_index=True,
         )
@@ -1153,29 +1153,39 @@ def _render_lead_proposals(lead_id, current_user):
 def _render_proposal_form(leads, current_user, fixed_lead_id=None):
     options = {f"{lead['id']} - {lead['company_name']}": lead["id"] for lead in leads}
     default_label = next((label for label, lead_id in options.items() if lead_id == fixed_lead_id), None)
+    form_key = fixed_lead_id or "geral"
+    selected = st.selectbox(
+        "Lead",
+        list(options.keys()),
+        index=list(options.keys()).index(default_label) if default_label else 0,
+        disabled=bool(fixed_lead_id),
+        key=f"proposal_lead_{form_key}",
+    )
+    c1, c2 = st.columns(2)
+    price_df = service_prices_df(active_only=True)
+    price_options = ["Manual / sem tabela"] + ([] if price_df.empty else price_df["id"].tolist())
+    price_choice = c1.selectbox(
+        "Servico / preco cadastrado",
+        price_options,
+        format_func=lambda value: value if isinstance(value, str) else _price_label(price_df, value),
+        key=f"proposal_price_{form_key}",
+    )
+    selected_price = _price_from_choice(price_df, price_choice)
+    quantity = _price_quantity_input(c2, selected_price, key=f"proposal_quantity_{form_key}")
+    _show_price_hint(selected_price, quantity)
     with st.form(f"nova_proposta_{fixed_lead_id or 'geral'}"):
-        selected = st.selectbox(
-            "Lead",
-            list(options.keys()),
-            index=list(options.keys()).index(default_label) if default_label else 0,
-            disabled=bool(fixed_lead_id),
-        )
         c1, c2 = st.columns(2)
-        price_df = service_prices_df(active_only=True)
-        price_options = ["Manual / sem tabela"] + ([] if price_df.empty else price_df["id"].tolist())
-        price_choice = c1.selectbox("Servico / preco cadastrado", price_options, format_func=lambda value: value if isinstance(value, str) else _price_label(price_df, value))
-        selected_price = _price_from_choice(price_df, price_choice)
         title = c1.text_input("Titulo *")
         default_service_type = selected_price.get("service_category") if selected_price else None
         service_type_options = sorted(set(PROPOSAL_SERVICE_TYPES + SERVICE_CATEGORIES))
         service_type = c2.selectbox("Tipo de servico", service_type_options, index=_index_or_zero(service_type_options, default_service_type))
         status = c1.selectbox("Status", PROPOSAL_STATUSES)
         valid_until = c2.date_input("Validade", value=date.today() + timedelta(days=15))
-        default_setup, default_recurring, default_total = _proposal_price_defaults(selected_price)
+        default_setup, default_recurring, default_total = _proposal_price_defaults(selected_price, quantity)
         setup_fee = c1.number_input("Fee setup", min_value=0.0, value=default_setup, step=1000.0)
         recurring_fee = c2.number_input("Fee recorrente mensal", min_value=0.0, value=default_recurring, step=1000.0)
         estimated_total = c1.number_input("Valor total estimado", min_value=0.0, value=default_total, step=1000.0)
-        notes_default = _proposal_price_note(selected_price)
+        notes_default = _proposal_price_note(selected_price, quantity)
         notes = st.text_area("Observacoes", value=notes_default)
         submit = st.form_submit_button("Cadastrar proposta")
         if submit:
@@ -1188,6 +1198,7 @@ def _render_proposal_form(leads, current_user, fixed_lead_id=None):
                 "owner_id": current_user["id"],
                 "service_id": selected_price.get("service_id") if selected_price else None,
                 "price_id": selected_price.get("id") if selected_price else None,
+                "price_quantity": quantity,
                 "title": title.strip(),
                 "service_type": service_type,
                 "status": status,
@@ -1207,23 +1218,41 @@ def _render_proposal_form(leads, current_user, fixed_lead_id=None):
 def _render_proposal_edit_form(proposal, leads, current_user):
     options = {f"{lead['id']} - {lead['company_name']}": lead["id"] for lead in leads}
     current_label = next((label for label, lead_id in options.items() if lead_id == proposal.get("lead_id")), list(options.keys())[0])
+    selected = st.selectbox("Lead", list(options.keys()), index=list(options.keys()).index(current_label), key=f"edit_proposal_lead_{proposal['id']}")
+    c1, c2 = st.columns(2)
+    price_df = service_prices_df(active_only=True)
+    price_options = ["Manual / sem tabela"] + ([] if price_df.empty else price_df["id"].tolist())
+    current_price = proposal.get("price_id")
+    price_index = price_options.index(current_price) if current_price in price_options else 0
+    price_choice = c1.selectbox(
+        "Servico / preco cadastrado",
+        price_options,
+        index=price_index,
+        format_func=lambda value: value if isinstance(value, str) else _price_label(price_df, value),
+        key=f"edit_proposal_price_{proposal['id']}",
+    )
+    selected_price = _price_from_choice(price_df, price_choice)
+    quantity = _price_quantity_input(
+        c2,
+        selected_price,
+        value=float(proposal.get("price_quantity") or 1),
+        key=f"edit_proposal_quantity_{proposal['id']}",
+    )
+    _show_price_hint(selected_price, quantity)
     with st.form(f"editar_proposta_{proposal['id']}"):
-        selected = st.selectbox("Lead", list(options.keys()), index=list(options.keys()).index(current_label))
         c1, c2 = st.columns(2)
-        price_df = service_prices_df(active_only=True)
-        price_options = ["Manual / sem tabela"] + ([] if price_df.empty else price_df["id"].tolist())
-        current_price = proposal.get("price_id")
-        price_index = price_options.index(current_price) if current_price in price_options else 0
-        price_choice = c1.selectbox("Servico / preco cadastrado", price_options, index=price_index, format_func=lambda value: value if isinstance(value, str) else _price_label(price_df, value))
-        selected_price = _price_from_choice(price_df, price_choice)
         title = c1.text_input("Titulo *", value=proposal.get("title") or "")
         service_type_options = sorted(set(PROPOSAL_SERVICE_TYPES + SERVICE_CATEGORIES))
         service_type = c2.selectbox("Tipo de servico", service_type_options, index=_index_or_zero(service_type_options, proposal.get("service_type")))
         status = c1.selectbox("Status", PROPOSAL_STATUSES, index=_index_or_zero(PROPOSAL_STATUSES, proposal.get("status")))
         valid_until = c2.date_input("Validade", value=parse_date(proposal.get("valid_until"), date.today() + timedelta(days=15)))
-        setup_fee = c1.number_input("Fee setup", min_value=0.0, value=float(proposal.get("setup_fee") or 0), step=1000.0)
-        recurring_fee = c2.number_input("Fee recorrente mensal", min_value=0.0, value=float(proposal.get("recurring_fee") or 0), step=1000.0)
-        estimated_total = c1.number_input("Valor total estimado", min_value=0.0, value=float(proposal.get("estimated_total") or 0), step=1000.0)
+        default_setup, default_recurring, default_total = _proposal_price_defaults(selected_price, quantity)
+        setup_value = float(proposal.get("setup_fee") or 0) or default_setup
+        recurring_value = float(proposal.get("recurring_fee") or 0) or default_recurring
+        total_value = float(proposal.get("estimated_total") or 0) or default_total
+        setup_fee = c1.number_input("Fee setup", min_value=0.0, value=setup_value, step=1000.0)
+        recurring_fee = c2.number_input("Fee recorrente mensal", min_value=0.0, value=recurring_value, step=1000.0)
+        estimated_total = c1.number_input("Valor total estimado", min_value=0.0, value=total_value, step=1000.0)
         notes = st.text_area("Observacoes", value=proposal.get("notes") or "")
         submit = st.form_submit_button("Salvar proposta")
         if submit:
@@ -1233,6 +1262,7 @@ def _render_proposal_edit_form(proposal, leads, current_user):
                 "owner_id": proposal.get("owner_id") or current_user["id"],
                 "service_id": selected_price.get("service_id") if selected_price else None,
                 "price_id": selected_price.get("id") if selected_price else None,
+                "price_quantity": quantity,
                 "title": title.strip(),
                 "service_type": service_type,
                 "status": status,
@@ -1413,7 +1443,7 @@ def _price_label(price_df, price_id):
         return str(price_id)
     item = row.iloc[0]
     status = f" [{item['status']}]" if item.get("status") == "Validar" else ""
-    return f"{item['service_name']} - {item['charge_type']} - {item['pricing_rule'] or item['valor_base_fmt']}{status}"
+    return f"{item['service_name']} - {item['charge_type']}{status}"
 
 
 def _price_from_choice(price_df, price_choice):
@@ -1423,23 +1453,68 @@ def _price_from_choice(price_df, price_choice):
     return None if row.empty else row.iloc[0].to_dict()
 
 
-def _proposal_price_defaults(price):
+def _price_quantity_input(container, price, value=1.0, key=None):
     if not price:
-        return 0.0, 0.0, 0.0
+        container.caption("Selecione um preco cadastrado para calcular pela tabela.")
+        return 1.0
+    charge_type = price.get("charge_type")
+    if charge_type == "Por documento":
+        label = "Quantidade de documentos"
+    elif charge_type == "Por fundo":
+        label = "Quantidade de fundos"
+    elif charge_type == "Mensal":
+        label = "Quantidade"
+    else:
+        label = "Quantidade"
+    disabled = charge_type in {"Unico", "Percentual de sucesso", "A definir"}
+    return float(container.number_input(label, min_value=1.0, value=float(value or 1), step=1.0, disabled=disabled, key=key))
+
+
+def _show_price_hint(price, quantity):
+    if not price:
+        return
     base = float(price.get("base_value") or 0)
     minimum = float(price.get("minimum_value") or 0)
+    amount = _proposal_price_amount(price, quantity)
+    pieces = [f"Valor unitario: {money(base)}"]
+    if quantity and quantity > 1:
+        pieces.append(f"Quantidade: {quantity:g}")
+        pieces.append(f"Total calculado: {money(amount)}")
+    if minimum and minimum > amount:
+        pieces.append(f"Minimo aplicado: {money(minimum)}")
+    if price.get("pricing_rule"):
+        pieces.append(f"Regra: {price['pricing_rule']}")
+    st.caption(" | ".join(pieces))
+
+
+def _proposal_price_amount(price, quantity=1):
+    if not price:
+        return 0.0
+    base = float(price.get("base_value") or 0)
+    minimum = float(price.get("minimum_value") or 0)
+    quantity = max(float(quantity or 1), 1)
+    return max(base * quantity, minimum)
+
+
+def _proposal_price_defaults(price, quantity=1):
+    if not price:
+        return 0.0, 0.0, 0.0
+    amount = _proposal_price_amount(price, quantity)
     charge_type = price.get("charge_type")
-    if charge_type == "Mensal":
-        return 0.0, base, max(base, minimum)
-    if charge_type in {"Unico", "Por documento", "Por fundo"}:
-        return 0.0, 0.0, max(base, minimum)
-    return 0.0, 0.0, minimum
+    if charge_type in {"Mensal", "Por fundo", "Por documento"}:
+        return 0.0, amount, amount
+    if charge_type == "Unico":
+        return 0.0, 0.0, amount
+    return 0.0, 0.0, amount
 
 
-def _proposal_price_note(price):
+def _proposal_price_note(price, quantity=1):
     if not price:
         return ""
     parts = []
+    amount = _proposal_price_amount(price, quantity)
+    parts.append(f"Preco selecionado: {price.get('service_name')} - {price.get('charge_type')}.")
+    parts.append(f"Quantidade considerada: {float(quantity or 1):g}. Valor calculado: {money(amount)}.")
     if price.get("pricing_rule"):
         parts.append(f"Regra da tabela: {price['pricing_rule']}")
     if price.get("status") == "Validar":

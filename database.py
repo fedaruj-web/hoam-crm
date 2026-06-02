@@ -292,6 +292,7 @@ def init_db():
                 owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 service_id INTEGER,
                 price_id INTEGER,
+                price_quantity DOUBLE PRECISION DEFAULT 1,
                 title TEXT NOT NULL,
                 service_type TEXT,
                 status TEXT NOT NULL DEFAULT 'Rascunho',
@@ -335,6 +336,7 @@ def init_db():
         """)
         _add_column(conn, "proposals", "service_id", "INTEGER")
         _add_column(conn, "proposals", "price_id", "INTEGER")
+        _add_column(conn, "proposals", "price_quantity", "DOUBLE PRECISION DEFAULT 1")
         _seed_initial_services(conn)
         if not cur.execute("SELECT 1 FROM users LIMIT 1").fetchone():
             cur.execute("""
@@ -443,6 +445,7 @@ def init_db():
             owner_id INTEGER,
             service_id INTEGER,
             price_id INTEGER,
+            price_quantity REAL DEFAULT 1,
             title TEXT NOT NULL,
             service_type TEXT,
             status TEXT NOT NULL DEFAULT 'Rascunho',
@@ -501,6 +504,7 @@ def init_db():
     _add_column(conn, "activities", "user_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL")
     _add_column(conn, "proposals", "service_id", "INTEGER")
     _add_column(conn, "proposals", "price_id", "INTEGER")
+    _add_column(conn, "proposals", "price_quantity", "REAL DEFAULT 1")
     _seed_initial_services(conn)
 
     if not cur.execute("SELECT 1 FROM users LIMIT 1").fetchone():
@@ -989,12 +993,12 @@ def get_clients():
 def add_proposal(data):
     return _execute_write("""
         INSERT INTO proposals (
-            lead_id, owner_id, service_id, price_id, title, service_type, status, setup_fee, recurring_fee,
+            lead_id, owner_id, service_id, price_id, price_quantity, title, service_type, status, setup_fee, recurring_fee,
             estimated_total, valid_until, sent_at, approved_at, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data["lead_id"], data.get("owner_id"), data.get("service_id"), data.get("price_id"),
-        data["title"], data.get("service_type"),
+        data.get("price_quantity", 1), data["title"], data.get("service_type"),
         data.get("status", "Rascunho"), data.get("setup_fee", 0), data.get("recurring_fee", 0),
         data.get("estimated_total", 0), data.get("valid_until"), data.get("sent_at"),
         data.get("approved_at"), data.get("notes"),
@@ -1004,13 +1008,13 @@ def add_proposal(data):
 def update_proposal(proposal_id, data):
     return _execute_write("""
         UPDATE proposals SET
-            lead_id=?, owner_id=?, service_id=?, price_id=?, title=?, service_type=?, status=?, setup_fee=?,
+            lead_id=?, owner_id=?, service_id=?, price_id=?, price_quantity=?, title=?, service_type=?, status=?, setup_fee=?,
             recurring_fee=?, estimated_total=?, valid_until=?, sent_at=?, approved_at=?,
             notes=?, updated_at=CURRENT_TIMESTAMP
         WHERE id=?
     """, (
         data["lead_id"], data.get("owner_id"), data.get("service_id"), data.get("price_id"),
-        data["title"], data.get("service_type"),
+        data.get("price_quantity", 1), data["title"], data.get("service_type"),
         data.get("status", "Rascunho"), data.get("setup_fee", 0), data.get("recurring_fee", 0),
         data.get("estimated_total", 0), data.get("valid_until"), data.get("sent_at"),
         data.get("approved_at"), data.get("notes"), proposal_id,
