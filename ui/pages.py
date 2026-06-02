@@ -10,11 +10,16 @@ from database import (
     OPPORTUNITY_STAGES,
     PROPOSAL_SERVICE_TYPES,
     PROPOSAL_STATUSES,
+    PRICE_CHARGE_TYPES,
+    PRICE_STATUSES,
+    SERVICE_CATEGORIES,
     USER_ROLES,
     add_activity,
     add_lead,
     add_opportunity,
     add_proposal,
+    add_service,
+    add_service_price,
     add_user,
     delete_lead,
     get_activities,
@@ -22,10 +27,15 @@ from database import (
     get_leads,
     get_opportunities,
     get_proposal,
+    get_service,
+    get_service_price,
+    get_service_prices,
     get_user,
     get_users,
     update_lead,
     update_proposal,
+    update_service,
+    update_service_price,
     update_user,
     upsert_client_from_lead,
 )
@@ -33,6 +43,7 @@ from services import (
     activity_history_df,
     clients_df,
     can_delete_leads,
+    can_manage_services,
     data_quality_summary,
     duplicate_groups_df,
     export_table,
@@ -48,6 +59,8 @@ from services import (
     proposals_df,
     merge_duplicate_pair,
     priority_for_status,
+    service_prices_df,
+    services_catalog_df,
     standardize_all_leads,
     users_options,
 )
@@ -407,9 +420,9 @@ def render_proposals(current_user):
         view = df if status_filter == "Todos" else df[df["status"] == status_filter]
         st.dataframe(
             view[[
-                "id", "company_name", "title", "service_type", "status", "owner_name",
+                "id", "company_name", "title", "catalog_service_name", "service_type", "status", "owner_name",
                 "setup_fee_fmt", "recurring_fee_fmt", "estimated_total_fmt", "valid_until", "sent_at", "approved_at",
-            ]],
+            ]].rename(columns={"catalog_service_name": "service_catalogo"}),
             use_container_width=True,
             hide_index=True,
         )
@@ -646,6 +659,167 @@ def render_clients():
         use_container_width=True,
         hide_index=True,
     )
+
+
+def render_services(current_user):
+    header("Servicos e Precos", "Catalogo comercial, tabela de precos e itens pendentes de validacao.")
+    services = services_catalog_df()
+    prices = service_prices_df()
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        metric_card("Servicos", 0 if services.empty else len(services), "catalogo")
+    with c2:
+        metric_card("Precos", 0 if prices.empty else len(prices), "condicoes")
+    with c3:
+        pending = 0 if prices.empty else int((prices["status"] == "Validar").sum())
+        metric_card("A validar", pending, "revisao comercial")
+    with c4:
+        active = 0 if services.empty else int((services["active"] == 1).sum())
+        metric_card("Ativos", active, "disponiveis")
+
+    tab_catalog, tab_prices, tab_pending = st.tabs(["Catalogo", "Tabela de precos", "Validacao"])
+
+    with tab_catalog:
+        if services.empty:
+            st.info("Nenhum servico cadastrado.")
+        else:
+            view = services[["id", "category", "name", "description", "scope_notes", "status", "price_count"]].rename(columns={
+                "id": "ID",
+                "category": "Categoria",
+                "name": "Servico",
+                "description": "Descricao",
+                "scope_notes": "Observacoes",
+                "status": "Status",
+                "price_count": "Precos",
+            })
+            st.dataframe(view, use_container_width=True, hide_index=True)
+
+        if can_manage_services(current_user):
+            st.markdown("#### Novo / editar servico")
+            service_ids = [] if services.empty else services["id"].tolist()
+            mode = st.radio("Acao", ["Novo servico", "Editar servico"], horizontal=True)
+            selected_service = None
+            if mode == "Editar servico" and service_ids:
+                selected_id = st.selectbox("Servico", service_ids, format_func=lambda sid: f"{sid} - {services.loc[services['id'] == sid, 'name'].iloc[0]}")
+                selected_service = get_service(int(selected_id))
+            with st.form("servico_form"):
+                c1, c2 = st.columns(2)
+                name = c1.text_input("Nome *", value=(selected_service or {}).get("name", ""))
+                category = c2.selectbox("Categoria", SERVICE_CATEGORIES, index=_index_or_zero(SERVICE_CATEGORIES, (selected_service or {}).get("category")))
+                description = st.text_area("Descricao", value=(selected_service or {}).get("description", ""))
+                scope_notes = st.text_area("Observacoes de escopo/validacao", value=(selected_service or {}).get("scope_notes", ""))
+                active = st.checkbox("Ativo", value=bool((selected_service or {}).get("active", 1)))
+                submit = st.form_submit_button("Salvar servico")
+                if submit:
+                    if not name.strip():
+                        st.error("Informe o nome do servico.")
+                    else:
+                        payload = {
+                            "name": name.strip(),
+                            "category": category,
+                            "description": description.strip(),
+                            "scope_notes": scope_notes.strip(),
+                            "active": active,
+                        }
+                        if selected_service:
+                            update_service(int(selected_service["id"]), payload)
+                        else:
+                            add_service(payload)
+                        st.success("Servico salvo.")
+                        st.rerun()
+
+    with tab_prices:
+        if prices.empty:
+            st.info("Nenhum preco cadastrado.")
+        else:
+            view = prices[[
+                "id", "service_category", "service_name", "charge_type", "valor_base_fmt",
+                "valor_minimo_fmt", "percentual_fmt", "pricing_rule", "status", "ativo",
+            ]].rename(columns={
+                "id": "ID",
+                "service_category": "Categoria",
+                "service_name": "Servico",
+                "charge_type": "Cobranca",
+                "valor_base_fmt": "Valor base",
+                "valor_minimo_fmt": "Valor minimo",
+                "percentual_fmt": "Percentual",
+                "pricing_rule": "Regra",
+                "status": "Status",
+                "ativo": "Ativo",
+            })
+            st.dataframe(view, use_container_width=True, hide_index=True)
+
+        if can_manage_services(current_user):
+            st.markdown("#### Novo / editar preco")
+            active_services = services_catalog_df(active_only=True)
+            if active_services.empty:
+                st.info("Cadastre um servico ativo antes de criar preco.")
+            else:
+                mode = st.radio("Acao do preco", ["Novo preco", "Editar preco"], horizontal=True)
+                selected_price = None
+                price_ids = [] if prices.empty else prices["id"].tolist()
+                if mode == "Editar preco" and price_ids:
+                    selected_price_id = st.selectbox("Preco", price_ids, format_func=lambda pid: _price_label(prices, pid))
+                    selected_price = get_service_price(int(selected_price_id))
+                with st.form("preco_form"):
+                    service_ids = active_services["id"].tolist()
+                    current_service_id = (selected_price or {}).get("service_id")
+                    service_index = service_ids.index(current_service_id) if current_service_id in service_ids else 0
+                    service_id = st.selectbox("Servico", service_ids, index=service_index, format_func=lambda sid: active_services.loc[active_services["id"] == sid, "name"].iloc[0])
+                    c1, c2, c3 = st.columns(3)
+                    charge_type = c1.selectbox("Tipo de cobranca", PRICE_CHARGE_TYPES, index=_index_or_zero(PRICE_CHARGE_TYPES, (selected_price or {}).get("charge_type")))
+                    status = c2.selectbox("Status", PRICE_STATUSES, index=_index_or_zero(PRICE_STATUSES, (selected_price or {}).get("status")))
+                    active = c3.checkbox("Ativo", value=bool((selected_price or {}).get("active", 1)))
+                    c1, c2, c3 = st.columns(3)
+                    base_value = c1.number_input("Valor base", min_value=0.0, value=float((selected_price or {}).get("base_value") or 0), step=100.0)
+                    minimum_value = c2.number_input("Valor minimo", min_value=0.0, value=float((selected_price or {}).get("minimum_value") or 0), step=100.0)
+                    success_percent = c3.number_input("Percentual sucesso (%)", min_value=0.0, value=float((selected_price or {}).get("success_percent") or 0), step=1.0)
+                    pricing_rule = st.text_area("Regra comercial", value=(selected_price or {}).get("pricing_rule", ""))
+                    submit = st.form_submit_button("Salvar preco")
+                    if submit:
+                        payload = {
+                            "service_id": int(service_id),
+                            "charge_type": charge_type,
+                            "base_value": base_value,
+                            "minimum_value": minimum_value,
+                            "success_percent": success_percent,
+                            "pricing_rule": pricing_rule.strip(),
+                            "status": status,
+                            "active": active,
+                        }
+                        if selected_price:
+                            update_service_price(int(selected_price["id"]), payload)
+                        else:
+                            add_service_price(payload)
+                        st.success("Preco salvo.")
+                        st.rerun()
+
+    with tab_pending:
+        st.markdown("#### Itens que precisam de validacao")
+        pending_prices = prices[prices["status"] == "Validar"] if not prices.empty else pd.DataFrame()
+        if pending_prices.empty:
+            st.success("Nenhum preco pendente de validacao.")
+        else:
+            st.dataframe(
+                pending_prices[["service_category", "service_name", "charge_type", "pricing_rule", "valor_base_fmt", "valor_minimo_fmt", "percentual_fmt"]].rename(columns={
+                    "service_category": "Categoria",
+                    "service_name": "Servico",
+                    "charge_type": "Cobranca",
+                    "pricing_rule": "Regra/duvida",
+                    "valor_base_fmt": "Valor base",
+                    "valor_minimo_fmt": "Valor minimo",
+                    "percentual_fmt": "Percentual",
+                }),
+                use_container_width=True,
+                hide_index=True,
+            )
+        st.markdown("#### Observacoes gerais do PDF")
+        st.write(
+            "Validar se Processamento contabil e Processamento de fundos/carteiras sao produtos separados; "
+            "qual item recebe R$ 500 por fundo; qual item recebe R$ 500 nos sistemas do contratante + R$ 1.000 com sistemas Hoam; "
+            "e qual item recebe minimo de R$ 1.000 conforme complexidade."
+        )
 
 
 def render_data_quality():
@@ -970,7 +1144,7 @@ def _render_lead_proposals(lead_id, current_user):
         st.info("Nenhuma proposta vinculada a este lead.")
     else:
         st.dataframe(
-            df[["id", "title", "service_type", "status", "setup_fee_fmt", "recurring_fee_fmt", "estimated_total_fmt", "valid_until"]],
+            df[["id", "title", "catalog_service_name", "service_type", "status", "setup_fee_fmt", "recurring_fee_fmt", "estimated_total_fmt", "valid_until"]].rename(columns={"catalog_service_name": "service_catalogo"}),
             use_container_width=True,
             hide_index=True,
         )
@@ -987,14 +1161,22 @@ def _render_proposal_form(leads, current_user, fixed_lead_id=None):
             disabled=bool(fixed_lead_id),
         )
         c1, c2 = st.columns(2)
+        price_df = service_prices_df(active_only=True)
+        price_options = ["Manual / sem tabela"] + ([] if price_df.empty else price_df["id"].tolist())
+        price_choice = c1.selectbox("Servico / preco cadastrado", price_options, format_func=lambda value: value if isinstance(value, str) else _price_label(price_df, value))
+        selected_price = _price_from_choice(price_df, price_choice)
         title = c1.text_input("Titulo *")
-        service_type = c2.selectbox("Tipo de servico", PROPOSAL_SERVICE_TYPES)
+        default_service_type = selected_price.get("service_category") if selected_price else None
+        service_type_options = sorted(set(PROPOSAL_SERVICE_TYPES + SERVICE_CATEGORIES))
+        service_type = c2.selectbox("Tipo de servico", service_type_options, index=_index_or_zero(service_type_options, default_service_type))
         status = c1.selectbox("Status", PROPOSAL_STATUSES)
         valid_until = c2.date_input("Validade", value=date.today() + timedelta(days=15))
-        setup_fee = c1.number_input("Fee setup", min_value=0.0, step=1000.0)
-        recurring_fee = c2.number_input("Fee recorrente mensal", min_value=0.0, step=1000.0)
-        estimated_total = c1.number_input("Valor total estimado", min_value=0.0, step=1000.0)
-        notes = st.text_area("Observacoes")
+        default_setup, default_recurring, default_total = _proposal_price_defaults(selected_price)
+        setup_fee = c1.number_input("Fee setup", min_value=0.0, value=default_setup, step=1000.0)
+        recurring_fee = c2.number_input("Fee recorrente mensal", min_value=0.0, value=default_recurring, step=1000.0)
+        estimated_total = c1.number_input("Valor total estimado", min_value=0.0, value=default_total, step=1000.0)
+        notes_default = _proposal_price_note(selected_price)
+        notes = st.text_area("Observacoes", value=notes_default)
         submit = st.form_submit_button("Cadastrar proposta")
         if submit:
             if not title.strip():
@@ -1004,6 +1186,8 @@ def _render_proposal_form(leads, current_user, fixed_lead_id=None):
             proposal_id = add_proposal({
                 "lead_id": lead_id,
                 "owner_id": current_user["id"],
+                "service_id": selected_price.get("service_id") if selected_price else None,
+                "price_id": selected_price.get("id") if selected_price else None,
                 "title": title.strip(),
                 "service_type": service_type,
                 "status": status,
@@ -1026,8 +1210,15 @@ def _render_proposal_edit_form(proposal, leads, current_user):
     with st.form(f"editar_proposta_{proposal['id']}"):
         selected = st.selectbox("Lead", list(options.keys()), index=list(options.keys()).index(current_label))
         c1, c2 = st.columns(2)
+        price_df = service_prices_df(active_only=True)
+        price_options = ["Manual / sem tabela"] + ([] if price_df.empty else price_df["id"].tolist())
+        current_price = proposal.get("price_id")
+        price_index = price_options.index(current_price) if current_price in price_options else 0
+        price_choice = c1.selectbox("Servico / preco cadastrado", price_options, index=price_index, format_func=lambda value: value if isinstance(value, str) else _price_label(price_df, value))
+        selected_price = _price_from_choice(price_df, price_choice)
         title = c1.text_input("Titulo *", value=proposal.get("title") or "")
-        service_type = c2.selectbox("Tipo de servico", PROPOSAL_SERVICE_TYPES, index=_index_or_zero(PROPOSAL_SERVICE_TYPES, proposal.get("service_type")))
+        service_type_options = sorted(set(PROPOSAL_SERVICE_TYPES + SERVICE_CATEGORIES))
+        service_type = c2.selectbox("Tipo de servico", service_type_options, index=_index_or_zero(service_type_options, proposal.get("service_type")))
         status = c1.selectbox("Status", PROPOSAL_STATUSES, index=_index_or_zero(PROPOSAL_STATUSES, proposal.get("status")))
         valid_until = c2.date_input("Validade", value=parse_date(proposal.get("valid_until"), date.today() + timedelta(days=15)))
         setup_fee = c1.number_input("Fee setup", min_value=0.0, value=float(proposal.get("setup_fee") or 0), step=1000.0)
@@ -1040,6 +1231,8 @@ def _render_proposal_edit_form(proposal, leads, current_user):
             update_proposal(int(proposal["id"]), {
                 "lead_id": lead_id,
                 "owner_id": proposal.get("owner_id") or current_user["id"],
+                "service_id": selected_price.get("service_id") if selected_price else None,
+                "price_id": selected_price.get("id") if selected_price else None,
                 "title": title.strip(),
                 "service_type": service_type,
                 "status": status,
@@ -1210,6 +1403,48 @@ def _filter_leads(df, status_filter, priority_filter, role_filter, owner_filter,
 def _lead_label(group, lead_id):
     row = group[group["id"] == lead_id].iloc[0]
     return f"{lead_id} - {row['company_name']}"
+
+
+def _price_label(price_df, price_id):
+    if price_df.empty:
+        return str(price_id)
+    row = price_df[price_df["id"] == price_id]
+    if row.empty:
+        return str(price_id)
+    item = row.iloc[0]
+    status = f" [{item['status']}]" if item.get("status") == "Validar" else ""
+    return f"{item['service_name']} - {item['charge_type']} - {item['pricing_rule'] or item['valor_base_fmt']}{status}"
+
+
+def _price_from_choice(price_df, price_choice):
+    if isinstance(price_choice, str) or price_df.empty:
+        return None
+    row = price_df[price_df["id"] == price_choice]
+    return None if row.empty else row.iloc[0].to_dict()
+
+
+def _proposal_price_defaults(price):
+    if not price:
+        return 0.0, 0.0, 0.0
+    base = float(price.get("base_value") or 0)
+    minimum = float(price.get("minimum_value") or 0)
+    charge_type = price.get("charge_type")
+    if charge_type == "Mensal":
+        return 0.0, base, max(base, minimum)
+    if charge_type in {"Unico", "Por documento", "Por fundo"}:
+        return 0.0, 0.0, max(base, minimum)
+    return 0.0, 0.0, minimum
+
+
+def _proposal_price_note(price):
+    if not price:
+        return ""
+    parts = []
+    if price.get("pricing_rule"):
+        parts.append(f"Regra da tabela: {price['pricing_rule']}")
+    if price.get("status") == "Validar":
+        parts.append("Preco marcado como pendente de validacao comercial.")
+    return "\n".join(parts)
 
 
 def _default_owner_index(options, current_user):

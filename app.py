@@ -14,6 +14,7 @@ from ui.pages import (
     render_opportunities,
     render_proposals,
     render_reports,
+    render_services,
     render_users,
 )
 from services import allowed_menus
@@ -46,7 +47,7 @@ NAV_GROUPS = {
     "Principal": ["Dashboard", "Leads", "Novo Lead"],
     "Relacionamento": ["Atividades", "Follow-ups", "Clientes"],
     "Pipeline": ["Oportunidades", "Propostas"],
-    "Gestao": ["Relatorios", "Qualidade de Dados", "Importar/Exportar", "Usuarios"],
+    "Gestao": ["Servicos", "Relatorios", "Qualidade de Dados", "Importar/Exportar", "Usuarios"],
 }
 
 st.sidebar.markdown('<div class="hoam-sidebar-nav">', unsafe_allow_html=True)
@@ -90,6 +91,8 @@ elif menu == "Clientes":
     render_clients()
 elif menu == "Relatorios":
     render_reports()
+elif menu == "Servicos":
+    render_services(current_user)
 elif menu == "Qualidade de Dados":
     render_data_quality()
 elif menu == "Importar/Exportar":

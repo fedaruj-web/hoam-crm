@@ -16,6 +16,8 @@ from database import (
     get_leads,
     get_opportunities,
     get_proposals,
+    get_service_prices,
+    get_services,
     get_users,
     lead_exists,
     merge_leads,
@@ -25,11 +27,11 @@ from database import (
 ROLE_MENUS = {
     "Administrador": {
         "Dashboard", "Leads", "Novo Lead", "Atividades", "Oportunidades", "Propostas",
-        "Follow-ups", "Clientes", "Relatorios", "Qualidade de Dados", "Importar/Exportar", "Usuarios",
+        "Follow-ups", "Clientes", "Servicos", "Relatorios", "Qualidade de Dados", "Importar/Exportar", "Usuarios",
     },
     "Gestor": {
         "Dashboard", "Leads", "Novo Lead", "Atividades", "Oportunidades", "Propostas",
-        "Follow-ups", "Clientes", "Relatorios", "Qualidade de Dados", "Importar/Exportar",
+        "Follow-ups", "Clientes", "Servicos", "Relatorios", "Qualidade de Dados", "Importar/Exportar",
     },
     "Comercial": {
         "Dashboard", "Leads", "Novo Lead", "Atividades", "Oportunidades", "Propostas",
@@ -50,6 +52,7 @@ def allowed_menus(user):
         "Propostas",
         "Follow-ups",
         "Clientes",
+        "Servicos",
         "Relatorios",
         "Qualidade de Dados",
         "Importar/Exportar",
@@ -68,6 +71,10 @@ def can_delete_leads(user):
 
 
 def can_import_export(user):
+    return (user or {}).get("role") in {"Administrador", "Gestor"}
+
+
+def can_manage_services(user):
     return (user or {}).get("role") in {"Administrador", "Gestor"}
 
 
@@ -335,6 +342,31 @@ def clients_df():
         return pd.DataFrame()
     df = pd.DataFrame(data)
     df["valor_estimado"] = pd.to_numeric(df["estimated_value"], errors="coerce").fillna(0).apply(money)
+    return df
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def services_catalog_df(active_only=False):
+    data = get_services(active_only=active_only)
+    if not data:
+        return pd.DataFrame()
+    df = pd.DataFrame(data)
+    df["status"] = df["active"].apply(lambda value: "Ativo" if int(value or 0) else "Inativo")
+    return df
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def service_prices_df(service_id=None, active_only=False):
+    data = get_service_prices(service_id=service_id, active_only=active_only)
+    if not data:
+        return pd.DataFrame()
+    df = pd.DataFrame(data)
+    for col in ["base_value", "minimum_value", "success_percent"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    df["valor_base_fmt"] = df["base_value"].apply(money)
+    df["valor_minimo_fmt"] = df["minimum_value"].apply(money)
+    df["percentual_fmt"] = df["success_percent"].apply(lambda value: f"{float(value):.1f}%".replace(".", ",") if float(value or 0) else "")
+    df["ativo"] = df["active"].apply(lambda value: "Sim" if int(value or 0) else "Nao")
     return df
 
 

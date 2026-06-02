@@ -80,6 +80,66 @@ PROPOSAL_SERVICE_TYPES = [
     "Outro",
 ]
 USER_ROLES = ["Administrador", "Gestor", "Comercial", "Backoffice"]
+SERVICE_CATEGORIES = ["BPO", "Implantacao", "Regulatorio", "Consultoria", "Cobranca", "Outro"]
+PRICE_CHARGE_TYPES = ["Unico", "Mensal", "Por documento", "Por fundo", "Percentual de sucesso", "A definir"]
+PRICE_STATUSES = ["Ativo", "Validar", "Inativo"]
+
+INITIAL_SERVICES = [
+    ("BPO", "Processamento contabil", "Rotina contabil do fundo/carteira, incluindo precificacao, rendimentos, demonstracoes e auditoria.", "Validar escopo fechado do pacote BPO."),
+    ("BPO", "Precificacao MTM", "Atualizacao do valor dos ativos pelos precos de fechamento do mercado.", ""),
+    ("BPO", "Apropriacao de rendimentos", "Contabilizacao de juros, dividendos, cupons e demais proventos da carteira.", ""),
+    ("BPO", "Suporte a demonstracao financeira", "Suporte na elaboracao de demonstracoes financeiras.", ""),
+    ("BPO", "Atendimento a auditoria", "Atendimento a auditoria interna e externa.", ""),
+    ("BPO", "Processamento de fundos/carteiras", "Rotina operacional de carteira: precos, eventos, provisoes, PL e cota.", "Validar se e produto separado ou pacote do BPO."),
+    ("BPO", "Captura de precos", "Obtencao de curvas de juros e precos de fechamento B3/ANBIMA.", ""),
+    ("BPO", "Processamento de eventos", "Registro de compras, vendas e vencimentos de titulos.", ""),
+    ("BPO", "Provisoes de despesas", "Lancamento diario pro rata de administracao e contas a pagar.", ""),
+    ("BPO", "Fechamento do PL", "Consolidacao de ativos e passivos para apuracao do patrimonio dos cotistas.", ""),
+    ("BPO", "Calculo da cota", "Calculo da cota do fundo/carteira.", ""),
+    ("Implantacao", "Implantacao de fundos/carteiras", "Setup inicial de carteiras, cotistas, ativos e cedentes.", ""),
+    ("Implantacao", "Cadastro de carteira", "Cadastro de carteira/ativo.", ""),
+    ("Implantacao", "Cadastro de cotistas", "Cadastro de passivo/cotistas.", ""),
+    ("Implantacao", "Cadastro de ativos da carteira", "Cadastro dos ativos da carteira.", ""),
+    ("Implantacao", "Cadastro de cedentes", "Cadastro de cedentes.", ""),
+    ("Regulatorio", "Informe diario", "Preparacao/envio de informe diario.", ""),
+    ("Regulatorio", "Informe mensal", "Perfil mensal.", ""),
+    ("Regulatorio", "CDA", "Composicao e diversificacao de carteira.", ""),
+    ("Regulatorio", "Demonstracoes contabeis", "Demonstracoes anuais e semestrais.", ""),
+    ("Regulatorio", "FIC", "Formulario de informacoes complementares.", ""),
+    ("Regulatorio", "Lamina de informacoes essenciais", "Lamina de informacoes essenciais.", ""),
+    ("Regulatorio", "Ranking ANBIMA", "Rotina de ranking ANBIMA.", ""),
+    ("Regulatorio", "Formulario de referencia anual", "Formulario de referencia anual.", ""),
+    ("Consultoria", "Estruturacao e setup de novos fundos", "Apoio na arquitetura do fundo: taxas, performance, resgate, politica e modelagem.", "Preco a definir."),
+    ("Consultoria", "Analise de lastro de operacoes", "Analise de existencia, veracidade, integridade, titularidade e qualidade do lastro.", "Preco a definir."),
+    ("Consultoria", "Parecer tecnico-juridico", "Emissao de legal opinion.", "Verificar com Diones."),
+    ("Consultoria", "Due diligence e selecao de prestadores", "Apoio na escolha de administrador, custodiante e auditor.", "Preco a definir."),
+    ("Consultoria", "Documentos de ofertas publicas", "Elaboracao de documentos de ofertas publicas.", ""),
+    ("Consultoria", "Documentos societarios", "Elaboracao de documentos societarios de fundos e investidas.", ""),
+    ("Consultoria", "Documentacao CVM", "Preparacao do material para registro no Fundos.NET/CVM.", ""),
+    ("Consultoria", "Credenciamento CVM/ANBIMA", "Credenciamento de gestores e administradores de recursos de terceiros.", "Verificar com Daruj."),
+    ("Consultoria", "Due diligence de cedentes", "Due diligence de cedentes.", "Preco a definir."),
+    ("Consultoria", "Resposta a oficios", "Resposta a oficios.", "Preco a definir."),
+    ("Cobranca", "Cobranca extrajudicial e judicial", "Cobranca extrajudicial e judicial.", ""),
+    ("Consultoria", "Politicas e manuais", "Elaboracao ou revisao de politicas e manuais.", ""),
+]
+
+INITIAL_PRICES = [
+    ("Documentos de ofertas publicas", "Por documento", 1000, 0, 0, "R$ 1.000,00 por documento", "Ativo"),
+    ("Documentos societarios", "Por documento", 500, 0, 0, "R$ 500,00 por documento", "Ativo"),
+    ("Documentacao CVM", "Por documento", 500, 0, 0, "R$ 500,00 por documento", "Ativo"),
+    ("Politicas e manuais", "Por documento", 500, 0, 0, "R$ 500,00 por documento", "Ativo"),
+    ("Cobranca extrajudicial e judicial", "Percentual de sucesso", 0, 0, 30, "30% do valor executado", "Ativo"),
+    ("Processamento contabil", "Por fundo", 500, 0, 0, "R$ 500,00 por fundo. Validar se aplica ao pacote contabil.", "Validar"),
+    ("Processamento de fundos/carteiras", "Mensal", 500, 0, 0, "R$ 500,00 usando sistemas do contratante; acrescimo de R$ 1.000,00 com sistemas Hoam.", "Validar"),
+    ("Implantacao de fundos/carteiras", "Unico", 0, 1000, 0, "Minimo de R$ 1.000,00, conforme complexidade da carteira.", "Validar"),
+    ("Estruturacao e setup de novos fundos", "A definir", 0, 0, 0, "A definir", "Validar"),
+    ("Analise de lastro de operacoes", "A definir", 0, 0, 0, "A definir", "Validar"),
+    ("Parecer tecnico-juridico", "A definir", 0, 0, 0, "Verificar com Diones", "Validar"),
+    ("Due diligence e selecao de prestadores", "A definir", 0, 0, 0, "A definir", "Validar"),
+    ("Credenciamento CVM/ANBIMA", "A definir", 0, 0, 0, "Verificar com Daruj", "Validar"),
+    ("Due diligence de cedentes", "A definir", 0, 0, 0, "A definir", "Validar"),
+    ("Resposta a oficios", "A definir", 0, 0, 0, "A definir", "Validar"),
+]
 
 
 def get_connection():
@@ -230,6 +290,8 @@ def init_db():
                 id SERIAL PRIMARY KEY,
                 lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
                 owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                service_id INTEGER,
+                price_id INTEGER,
                 title TEXT NOT NULL,
                 service_type TEXT,
                 status TEXT NOT NULL DEFAULT 'Rascunho',
@@ -244,6 +306,36 @@ def init_db():
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS services_catalog (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                category TEXT NOT NULL,
+                description TEXT,
+                scope_notes TEXT,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS service_prices (
+                id SERIAL PRIMARY KEY,
+                service_id INTEGER NOT NULL REFERENCES services_catalog(id) ON DELETE CASCADE,
+                charge_type TEXT NOT NULL DEFAULT 'A definir',
+                base_value DOUBLE PRECISION DEFAULT 0,
+                minimum_value DOUBLE PRECISION DEFAULT 0,
+                success_percent DOUBLE PRECISION DEFAULT 0,
+                pricing_rule TEXT,
+                status TEXT NOT NULL DEFAULT 'Validar',
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        _add_column(conn, "proposals", "service_id", "INTEGER")
+        _add_column(conn, "proposals", "price_id", "INTEGER")
+        _seed_initial_services(conn)
         if not cur.execute("SELECT 1 FROM users LIMIT 1").fetchone():
             cur.execute("""
                 INSERT INTO users (name, email, role, password_hash, active)
@@ -349,6 +441,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             lead_id INTEGER NOT NULL,
             owner_id INTEGER,
+            service_id INTEGER,
+            price_id INTEGER,
             title TEXT NOT NULL,
             service_type TEXT,
             status TEXT NOT NULL DEFAULT 'Rascunho',
@@ -365,6 +459,34 @@ def init_db():
             FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS services_catalog (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            category TEXT NOT NULL,
+            description TEXT,
+            scope_notes TEXT,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS service_prices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            service_id INTEGER NOT NULL,
+            charge_type TEXT NOT NULL DEFAULT 'A definir',
+            base_value REAL DEFAULT 0,
+            minimum_value REAL DEFAULT 0,
+            success_percent REAL DEFAULT 0,
+            pricing_rule TEXT,
+            status TEXT NOT NULL DEFAULT 'Validar',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (service_id) REFERENCES services_catalog(id) ON DELETE CASCADE
+        )
+    """)
 
     _add_column(conn, "leads", "owner_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL")
     _add_column(conn, "leads", "client_since", "TEXT")
@@ -377,6 +499,9 @@ def init_db():
     _add_column(conn, "leads", "do_not_contact", "INTEGER NOT NULL DEFAULT 0")
     _add_column(conn, "leads", "do_not_contact_reason", "TEXT")
     _add_column(conn, "activities", "user_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL")
+    _add_column(conn, "proposals", "service_id", "INTEGER")
+    _add_column(conn, "proposals", "price_id", "INTEGER")
+    _seed_initial_services(conn)
 
     if not cur.execute("SELECT 1 FROM users LIMIT 1").fetchone():
         cur.execute("""
@@ -386,6 +511,36 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+
+def _seed_initial_services(conn):
+    if _fetchone(conn, "SELECT 1 FROM services_catalog LIMIT 1"):
+        return
+    service_ids = {}
+    for category, name, description, scope_notes in INITIAL_SERVICES:
+        row = _fetchone(conn, "SELECT id FROM services_catalog WHERE name=?", (name,))
+        if row:
+            service_ids[name] = row["id"]
+            continue
+        cur = conn.execute(_sql("""
+            INSERT INTO services_catalog (name, category, description, scope_notes, active)
+            VALUES (?, ?, ?, ?, 1)
+        """), (name, category, description, scope_notes))
+        if IS_POSTGRES:
+            service_ids[name] = _fetchone(conn, "SELECT id FROM services_catalog WHERE name=?", (name,))["id"]
+        else:
+            service_ids[name] = cur.lastrowid
+
+    for service_name, charge_type, base_value, minimum_value, success_percent, pricing_rule, status in INITIAL_PRICES:
+        service_id = service_ids.get(service_name)
+        if not service_id:
+            continue
+        conn.execute(_sql("""
+            INSERT INTO service_prices (
+                service_id, charge_type, base_value, minimum_value, success_percent,
+                pricing_rule, status, active
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        """), (service_id, charge_type, base_value, minimum_value, success_percent, pricing_rule, status))
 
 
 def _execute_write(sql, params=()):
@@ -479,6 +634,111 @@ def get_user(user_id):
     )
     conn.close()
     return dict(row) if row else None
+
+
+def get_services(active_only=False):
+    conn = get_connection()
+    sql = """
+        SELECT s.*,
+               COUNT(p.id) AS price_count
+        FROM services_catalog s
+        LEFT JOIN service_prices p ON p.service_id = s.id
+    """
+    if active_only:
+        sql += " WHERE s.active=1"
+    sql += " GROUP BY s.id, s.name, s.category, s.description, s.scope_notes, s.active, s.created_at, s.updated_at ORDER BY s.category, s.name"
+    rows = _fetchall(conn, sql)
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_service(service_id):
+    conn = get_connection()
+    row = _fetchone(conn, "SELECT * FROM services_catalog WHERE id=?", (service_id,))
+    conn.close()
+    return dict(row) if row else None
+
+
+def add_service(data):
+    return _execute_write("""
+        INSERT INTO services_catalog (name, category, description, scope_notes, active)
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        data["name"], data["category"], data.get("description"), data.get("scope_notes"),
+        1 if data.get("active", True) else 0,
+    ))
+
+
+def update_service(service_id, data):
+    return _execute_write("""
+        UPDATE services_catalog
+        SET name=?, category=?, description=?, scope_notes=?, active=?, updated_at=CURRENT_TIMESTAMP
+        WHERE id=?
+    """, (
+        data["name"], data["category"], data.get("description"), data.get("scope_notes"),
+        1 if data.get("active", True) else 0, service_id,
+    ))
+
+
+def get_service_prices(service_id=None, active_only=False):
+    conn = get_connection()
+    where = []
+    params = []
+    if service_id:
+        where.append("p.service_id=?")
+        params.append(service_id)
+    if active_only:
+        where.append("p.active=1 AND s.active=1")
+    where_sql = "WHERE " + " AND ".join(where) if where else ""
+    rows = _fetchall(conn, f"""
+        SELECT p.*, s.name AS service_name, s.category AS service_category
+        FROM service_prices p
+        JOIN services_catalog s ON s.id = p.service_id
+        {where_sql}
+        ORDER BY s.category, s.name, p.status, p.id
+    """, params)
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_service_price(price_id):
+    conn = get_connection()
+    row = _fetchone(conn, """
+        SELECT p.*, s.name AS service_name, s.category AS service_category
+        FROM service_prices p
+        JOIN services_catalog s ON s.id = p.service_id
+        WHERE p.id=?
+    """, (price_id,))
+    conn.close()
+    return dict(row) if row else None
+
+
+def add_service_price(data):
+    return _execute_write("""
+        INSERT INTO service_prices (
+            service_id, charge_type, base_value, minimum_value, success_percent,
+            pricing_rule, status, active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data["service_id"], data.get("charge_type", "A definir"),
+        data.get("base_value", 0), data.get("minimum_value", 0), data.get("success_percent", 0),
+        data.get("pricing_rule"), data.get("status", "Validar"),
+        1 if data.get("active", True) else 0,
+    ))
+
+
+def update_service_price(price_id, data):
+    return _execute_write("""
+        UPDATE service_prices
+        SET service_id=?, charge_type=?, base_value=?, minimum_value=?, success_percent=?,
+            pricing_rule=?, status=?, active=?, updated_at=CURRENT_TIMESTAMP
+        WHERE id=?
+    """, (
+        data["service_id"], data.get("charge_type", "A definir"),
+        data.get("base_value", 0), data.get("minimum_value", 0), data.get("success_percent", 0),
+        data.get("pricing_rule"), data.get("status", "Validar"),
+        1 if data.get("active", True) else 0, price_id,
+    ))
 
 
 def add_lead(data):
@@ -729,11 +989,12 @@ def get_clients():
 def add_proposal(data):
     return _execute_write("""
         INSERT INTO proposals (
-            lead_id, owner_id, title, service_type, status, setup_fee, recurring_fee,
+            lead_id, owner_id, service_id, price_id, title, service_type, status, setup_fee, recurring_fee,
             estimated_total, valid_until, sent_at, approved_at, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        data["lead_id"], data.get("owner_id"), data["title"], data.get("service_type"),
+        data["lead_id"], data.get("owner_id"), data.get("service_id"), data.get("price_id"),
+        data["title"], data.get("service_type"),
         data.get("status", "Rascunho"), data.get("setup_fee", 0), data.get("recurring_fee", 0),
         data.get("estimated_total", 0), data.get("valid_until"), data.get("sent_at"),
         data.get("approved_at"), data.get("notes"),
@@ -743,12 +1004,13 @@ def add_proposal(data):
 def update_proposal(proposal_id, data):
     return _execute_write("""
         UPDATE proposals SET
-            lead_id=?, owner_id=?, title=?, service_type=?, status=?, setup_fee=?,
+            lead_id=?, owner_id=?, service_id=?, price_id=?, title=?, service_type=?, status=?, setup_fee=?,
             recurring_fee=?, estimated_total=?, valid_until=?, sent_at=?, approved_at=?,
             notes=?, updated_at=CURRENT_TIMESTAMP
         WHERE id=?
     """, (
-        data["lead_id"], data.get("owner_id"), data["title"], data.get("service_type"),
+        data["lead_id"], data.get("owner_id"), data.get("service_id"), data.get("price_id"),
+        data["title"], data.get("service_type"),
         data.get("status", "Rascunho"), data.get("setup_fee", 0), data.get("recurring_fee", 0),
         data.get("estimated_total", 0), data.get("valid_until"), data.get("sent_at"),
         data.get("approved_at"), data.get("notes"), proposal_id,
@@ -763,10 +1025,16 @@ def get_proposals(lead_id=None):
         where = "WHERE p.lead_id=?"
         params.append(lead_id)
     rows = _fetchall(conn, f"""
-        SELECT p.*, l.company_name, l.status AS lead_status, u.name AS owner_name
+        SELECT p.*, l.company_name, l.status AS lead_status, u.name AS owner_name,
+               s.name AS catalog_service_name, s.category AS catalog_service_category,
+               sp.charge_type AS price_charge_type, sp.pricing_rule AS price_rule,
+               sp.base_value AS price_base_value, sp.minimum_value AS price_minimum_value,
+               sp.success_percent AS price_success_percent, sp.status AS price_status
         FROM proposals p
         JOIN leads l ON l.id = p.lead_id
         LEFT JOIN users u ON u.id = p.owner_id
+        LEFT JOIN services_catalog s ON s.id = p.service_id
+        LEFT JOIN service_prices sp ON sp.id = p.price_id
         {where}
         ORDER BY p.updated_at DESC, p.id DESC
     """, params)
@@ -777,10 +1045,16 @@ def get_proposals(lead_id=None):
 def get_proposal(proposal_id):
     conn = get_connection()
     row = _fetchone(conn, """
-        SELECT p.*, l.company_name, l.status AS lead_status, u.name AS owner_name
+        SELECT p.*, l.company_name, l.status AS lead_status, u.name AS owner_name,
+               s.name AS catalog_service_name, s.category AS catalog_service_category,
+               sp.charge_type AS price_charge_type, sp.pricing_rule AS price_rule,
+               sp.base_value AS price_base_value, sp.minimum_value AS price_minimum_value,
+               sp.success_percent AS price_success_percent, sp.status AS price_status
         FROM proposals p
         JOIN leads l ON l.id = p.lead_id
         LEFT JOIN users u ON u.id = p.owner_id
+        LEFT JOIN services_catalog s ON s.id = p.service_id
+        LEFT JOIN service_prices sp ON sp.id = p.price_id
         WHERE p.id=?
     """, (proposal_id,))
     conn.close()

@@ -28,8 +28,15 @@ TABLES = {
         "id", "lead_id", "company_name", "contact_name", "email", "phone", "owner_id",
         "estimated_value", "converted_at", "notes",
     ],
+    "services_catalog": [
+        "id", "name", "category", "description", "scope_notes", "active", "created_at", "updated_at",
+    ],
+    "service_prices": [
+        "id", "service_id", "charge_type", "base_value", "minimum_value", "success_percent",
+        "pricing_rule", "status", "active", "created_at", "updated_at",
+    ],
     "proposals": [
-        "id", "lead_id", "owner_id", "title", "service_type", "status", "setup_fee",
+        "id", "lead_id", "owner_id", "service_id", "price_id", "title", "service_type", "status", "setup_fee",
         "recurring_fee", "estimated_total", "valid_until", "sent_at", "approved_at", "notes",
         "created_at", "updated_at",
     ],
@@ -65,7 +72,7 @@ def migrate(sqlite_path, database_url):
 
     with psycopg.connect(database_url) as conn:
         with conn.transaction():
-            conn.execute("TRUNCATE proposals, clients, opportunities, activities, leads, users RESTART IDENTITY CASCADE")
+            conn.execute("TRUNCATE service_prices, services_catalog, proposals, clients, opportunities, activities, leads, users RESTART IDENTITY CASCADE")
             for table, columns in TABLES.items():
                 selected, rows = sqlite_rows(sqlite_path, table, columns)
                 if not rows:
