@@ -1173,12 +1173,11 @@ def _render_proposal_form(leads, current_user, fixed_lead_id=None):
     selected_price = _price_from_choice(price_df, price_choice)
     quantity = _price_quantity_input(c2, selected_price, key=f"proposal_quantity_{form_key}")
     _show_price_hint(selected_price, quantity)
+    active_services = services_catalog_df(active_only=True)
     with st.form(f"nova_proposta_{fixed_lead_id or 'geral'}"):
         c1, c2 = st.columns(2)
         title = c1.text_input("Titulo *")
-        default_service_type = selected_price.get("service_category") if selected_price else None
-        service_type_options = sorted(set(PROPOSAL_SERVICE_TYPES + SERVICE_CATEGORIES))
-        service_type = c2.selectbox("Tipo de servico", service_type_options, index=_index_or_zero(service_type_options, default_service_type))
+        selected_service = _service_selectbox(c2, active_services, selected_price, key=f"proposal_service_{form_key}")
         status = c1.selectbox("Status", PROPOSAL_STATUSES)
         valid_until = c2.date_input("Validade", value=date.today() + timedelta(days=15))
         default_setup, default_recurring, default_total = _proposal_price_defaults(selected_price, quantity)
@@ -1196,11 +1195,11 @@ def _render_proposal_form(leads, current_user, fixed_lead_id=None):
             proposal_id = add_proposal({
                 "lead_id": lead_id,
                 "owner_id": current_user["id"],
-                "service_id": selected_price.get("service_id") if selected_price else None,
+                "service_id": selected_service.get("id") if selected_service else None,
                 "price_id": selected_price.get("id") if selected_price else None,
                 "price_quantity": quantity,
                 "title": title.strip(),
-                "service_type": service_type,
+                "service_type": selected_service.get("category") if selected_service else None,
                 "status": status,
                 "setup_fee": setup_fee,
                 "recurring_fee": recurring_fee,
@@ -1239,11 +1238,17 @@ def _render_proposal_edit_form(proposal, leads, current_user):
         key=f"edit_proposal_quantity_{proposal['id']}",
     )
     _show_price_hint(selected_price, quantity)
+    active_services = services_catalog_df(active_only=True)
     with st.form(f"editar_proposta_{proposal['id']}"):
         c1, c2 = st.columns(2)
         title = c1.text_input("Titulo *", value=proposal.get("title") or "")
-        service_type_options = sorted(set(PROPOSAL_SERVICE_TYPES + SERVICE_CATEGORIES))
-        service_type = c2.selectbox("Tipo de servico", service_type_options, index=_index_or_zero(service_type_options, proposal.get("service_type")))
+        selected_service = _service_selectbox(
+            c2,
+            active_services,
+            selected_price,
+            current_service_id=proposal.get("service_id"),
+            key=f"edit_proposal_service_{proposal['id']}",
+        )
         status = c1.selectbox("Status", PROPOSAL_STATUSES, index=_index_or_zero(PROPOSAL_STATUSES, proposal.get("status")))
         valid_until = c2.date_input("Validade", value=parse_date(proposal.get("valid_until"), date.today() + timedelta(days=15)))
         default_setup, default_recurring, default_total = _proposal_price_defaults(selected_price, quantity)
@@ -1260,11 +1265,11 @@ def _render_proposal_edit_form(proposal, leads, current_user):
             update_proposal(int(proposal["id"]), {
                 "lead_id": lead_id,
                 "owner_id": proposal.get("owner_id") or current_user["id"],
-                "service_id": selected_price.get("service_id") if selected_price else None,
+                "service_id": selected_service.get("id") if selected_service else None,
                 "price_id": selected_price.get("id") if selected_price else None,
                 "price_quantity": quantity,
                 "title": title.strip(),
-                "service_type": service_type,
+                "service_type": selected_service.get("category") if selected_service else None,
                 "status": status,
                 "setup_fee": setup_fee,
                 "recurring_fee": recurring_fee,
@@ -1451,6 +1456,41 @@ def _price_from_choice(price_df, price_choice):
         return None
     row = price_df[price_df["id"] == price_choice]
     return None if row.empty else row.iloc[0].to_dict()
+
+
+def _service_selectbox(container, services_df, selected_price=None, current_service_id=None, key=None):
+    if selected_price:
+        service_id = int(selected_price.get("service_id") or 0)
+        name = selected_price.get("service_name") or ""
+        category = selected_price.get("service_category") or ""
+        container.text_input("Servico", value=f"{name} - {category}".strip(" -"), disabled=True, key=key)
+        return {
+            "id": service_id,
+            "name": name,
+            "category": category,
+        }
+    if services_df.empty:
+        container.caption("Cadastre servicos ativos para vincular a proposta ao catalogo.")
+        return None
+    service_ids = services_df["id"].tolist()
+    selected_id = current_service_id if current_service_id in service_ids else service_ids[0]
+    service_id = container.selectbox(
+        "Servico",
+        service_ids,
+        index=service_ids.index(selected_id),
+        format_func=lambda sid: _service_label(services_df, sid),
+        key=key,
+    )
+    row = services_df[services_df["id"] == service_id].iloc[0]
+    return {"id": int(row["id"]), "name": row["name"], "category": row["category"]}
+
+
+def _service_label(services_df, service_id):
+    row = services_df[services_df["id"] == service_id]
+    if row.empty:
+        return str(service_id)
+    item = row.iloc[0]
+    return f"{item['name']} - {item['category']}"
 
 
 def _price_quantity_input(container, price, value=1.0, key=None):
