@@ -47,7 +47,7 @@ TABLES = {
         "created_at", "updated_at",
     ],
     "proposal_services": [
-        "id", "proposal_id", "service_template_id", "custom_description", "custom_price", "created_at",
+        "id", "proposal_id", "service_template_id", "price_id", "quantity", "custom_description", "custom_price", "created_at",
     ],
 }
 

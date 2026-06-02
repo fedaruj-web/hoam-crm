@@ -354,6 +354,8 @@ def init_db():
                 id SERIAL PRIMARY KEY,
                 proposal_id INTEGER NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
                 service_template_id INTEGER REFERENCES service_templates(id) ON DELETE SET NULL,
+                price_id INTEGER,
+                quantity DOUBLE PRECISION DEFAULT 1,
                 custom_description TEXT,
                 custom_price DOUBLE PRECISION DEFAULT 0,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -389,9 +391,11 @@ def init_db():
         _add_column(conn, "proposals", "service_id", "INTEGER")
         _add_column(conn, "proposals", "price_id", "INTEGER")
         _add_column(conn, "proposals", "price_quantity", "DOUBLE PRECISION DEFAULT 1")
+        _add_column(conn, "proposal_services", "price_id", "INTEGER")
+        _add_column(conn, "proposal_services", "quantity", "DOUBLE PRECISION DEFAULT 1")
         _add_proposal_term_columns(conn, "DOUBLE PRECISION")
-        _seed_service_templates(conn)
         _seed_initial_services(conn)
+        _seed_service_templates(conn)
         if not cur.execute("SELECT 1 FROM users LIMIT 1").fetchone():
             cur.execute("""
                 INSERT INTO users (name, email, role, password_hash, active)
@@ -548,6 +552,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             proposal_id INTEGER NOT NULL,
             service_template_id INTEGER,
+            price_id INTEGER,
+            quantity REAL DEFAULT 1,
             custom_description TEXT,
             custom_price REAL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -598,9 +604,11 @@ def init_db():
     _add_column(conn, "proposals", "service_id", "INTEGER")
     _add_column(conn, "proposals", "price_id", "INTEGER")
     _add_column(conn, "proposals", "price_quantity", "REAL DEFAULT 1")
+    _add_column(conn, "proposal_services", "price_id", "INTEGER")
+    _add_column(conn, "proposal_services", "quantity", "REAL DEFAULT 1")
     _add_proposal_term_columns(conn, "REAL")
-    _seed_service_templates(conn)
     _seed_initial_services(conn)
+    _seed_service_templates(conn)
 
     if not cur.execute("SELECT 1 FROM users LIMIT 1").fetchone():
         cur.execute("""
@@ -631,27 +639,38 @@ def _add_proposal_term_columns(conn, money_type):
 
 
 def _seed_service_templates(conn):
-    if _fetchone(conn, "SELECT 1 FROM service_templates LIMIT 1"):
+    catalog = _fetchall(conn, "SELECT name, category, description, scope_notes, active FROM services_catalog")
+    if not catalog:
         return
-    for (
-        name,
-        category,
-        short_description,
-        full_scope,
-        deliverables,
-        assumptions,
-        exclusions,
-        default_price,
-    ) in INITIAL_SERVICE_TEMPLATES:
+    catalog_names = {row["name"] for row in catalog}
+    existing = {
+        row["name"]: row["id"]
+        for row in _fetchall(conn, "SELECT id, name FROM service_templates")
+    }
+    for item in catalog:
+        if item["name"] in existing:
+            conn.execute(_sql("""
+                UPDATE service_templates
+                SET category=?, short_description=?, full_scope=?, assumptions=?, active=?
+                WHERE id=?
+            """), (
+                item["category"], item["description"], item["description"],
+                item["scope_notes"], 1 if item["active"] else 0, existing[item["name"]],
+            ))
+            continue
         conn.execute(_sql("""
             INSERT INTO service_templates (
                 name, category, short_description, full_scope, deliverables,
                 assumptions, exclusions, default_price, active
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
         """), (
-            name, category, short_description, full_scope, deliverables,
-            assumptions, exclusions, default_price,
+            item["name"], item["category"], item["description"], item["description"],
+            "", item["scope_notes"], "", 0,
         ))
+    if catalog_names:
+        for name, template_id in existing.items():
+            if name not in catalog_names:
+                conn.execute(_sql("UPDATE service_templates SET active=0 WHERE id=?"), (template_id,))
 
 
 def _seed_initial_services(conn):
@@ -1264,9 +1283,14 @@ def get_proposal_services(proposal_id):
     conn = get_connection()
     rows = _fetchall(conn, """
         SELECT ps.*, st.name, st.category, st.short_description, st.full_scope,
-               st.deliverables, st.assumptions, st.exclusions, st.default_price
+               st.deliverables, st.assumptions, st.exclusions, st.default_price,
+               sp.charge_type, sp.pricing_rule, sp.base_value, sp.minimum_value,
+               sp.success_percent, sc.name AS price_service_name, sc.category AS price_service_category,
+               sc.description AS price_service_description, sc.scope_notes AS price_service_scope_notes
         FROM proposal_services ps
         LEFT JOIN service_templates st ON st.id = ps.service_template_id
+        LEFT JOIN service_prices sp ON sp.id = ps.price_id
+        LEFT JOIN services_catalog sc ON sc.id = sp.service_id
         WHERE ps.proposal_id=?
         ORDER BY ps.id
     """, (proposal_id,))
@@ -1280,11 +1304,13 @@ def set_proposal_services(proposal_id, services):
     for item in services:
         conn.execute(_sql("""
             INSERT INTO proposal_services (
-                proposal_id, service_template_id, custom_description, custom_price
-            ) VALUES (?, ?, ?, ?)
+                proposal_id, service_template_id, price_id, quantity, custom_description, custom_price
+            ) VALUES (?, ?, ?, ?, ?, ?)
         """), (
             proposal_id,
             item.get("service_template_id"),
+            item.get("price_id"),
+            item.get("quantity", 1),
             item.get("custom_description"),
             item.get("custom_price", 0),
         ))

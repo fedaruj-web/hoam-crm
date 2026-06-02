@@ -419,9 +419,9 @@ def render_proposals(current_user):
 
 
 def _render_commercial_proposal_form(leads, current_user):
-    templates = get_service_templates(active_only=True)
-    if not templates:
-        st.info("Nenhum template de servico ativo cadastrado.")
+    price_catalog = service_prices_df(active_only=True)
+    if price_catalog.empty:
+        st.info("Nenhum servico/preco ativo cadastrado. Use a tela Servicos para ativar a tabela comercial.")
         return
 
     source = st.radio("Cliente", ["Lead existente", "Cliente manual"], horizontal=True)
@@ -452,37 +452,47 @@ def _render_commercial_proposal_form(leads, current_user):
 
     st.markdown("#### Servicos contratados")
     selected_services = []
-    template_df = pd.DataFrame(templates)
-    for category in sorted(template_df["category"].fillna("Outros").unique()):
-        category_templates = template_df[template_df["category"].fillna("Outros") == category]
+    for category in sorted(price_catalog["service_category"].fillna("Outros").unique()):
+        category_prices = price_catalog[price_catalog["service_category"].fillna("Outros") == category]
         with st.expander(category, expanded=True):
-            for item in category_templates.to_dict("records"):
-                checked = st.checkbox(item["name"], key=f"term_service_{item['id']}")
-                st.caption(item.get("short_description") or "")
+            for item in category_prices.to_dict("records"):
+                label = f"{item['service_name']} - {item['charge_type']}"
+                checked = st.checkbox(label, key=f"term_price_service_{item['id']}")
+                hint = item.get("pricing_rule") or item.get("valor_base_fmt") or ""
+                if hint:
+                    st.caption(hint)
                 if checked:
-                    c1, c2 = st.columns([2, 1])
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    default_description = _catalog_service_description(item)
                     custom_description = c1.text_area(
                         "Descricao customizada",
-                        value=item.get("full_scope") or item.get("short_description") or "",
-                        key=f"term_desc_{item['id']}",
+                        value=default_description,
+                        key=f"term_desc_price_{item['id']}",
                     )
+                    quantity = _term_quantity_input(c2, item, key=f"term_qty_price_{item['id']}")
+                    amount = _proposal_price_amount(item, quantity)
                     custom_price = c2.number_input(
-                        "Preco",
+                        "Valor calculado",
                         min_value=0.0,
-                        value=float(item.get("default_price") or 0),
+                        value=float(amount),
                         step=500.0,
-                        key=f"term_price_{item['id']}",
+                        key=f"term_value_price_{item['id']}",
                     )
+                    c3.caption(f"Base: {item.get('valor_base_fmt') or money(item.get('base_value') or 0)}")
+                    c3.caption(f"Tipo: {item.get('charge_type') or ''}")
                     selected_services.append({
-                        "service_template_id": int(item["id"]),
-                        "custom_description": custom_description.strip(),
+                        "service_template_id": None,
+                        "price_id": int(item["id"]),
+                        "quantity": quantity,
+                        "custom_description": _proposal_service_description_payload(item, custom_description, quantity),
                         "custom_price": custom_price,
+                        "charge_type": item.get("charge_type"),
                     })
 
     st.markdown("#### Condicoes comerciais")
     c1, c2, c3 = st.columns(3)
     initial_fee = c1.number_input("Fee inicial", min_value=0.0, value=0.0, step=1000.0)
-    monthly_default = float(sum(item["custom_price"] for item in selected_services))
+    monthly_default = float(sum(item["custom_price"] for item in selected_services if item.get("charge_type") in {"Mensal", "Por fundo", "Por documento"}))
     monthly_fee = c2.number_input("Fee recorrente mensal", min_value=0.0, value=monthly_default, step=1000.0)
     success_fee = c3.number_input("Success fee (%)", min_value=0.0, value=0.0, step=1.0)
     payment_terms = st.text_area("Condicoes de pagamento", value="Fee mensal pago ate o 5o dia util de cada mes, salvo condicao especifica negociada entre as partes.")
@@ -610,6 +620,48 @@ def _client_defaults_from_lead(lead):
     }
 
 
+def _catalog_service_description(item):
+    parts = []
+    if item.get("service_name"):
+        parts.append(str(item["service_name"]))
+    if item.get("service_category"):
+        parts.append(f"Categoria: {item['service_category']}")
+    if item.get("pricing_rule"):
+        parts.append(f"Regra comercial: {item['pricing_rule']}")
+    if item.get("status") == "Validar":
+        parts.append("Observacao: preco marcado como pendente de validacao comercial.")
+    return "\n".join(parts)
+
+
+def _term_quantity_input(container, price, key=None):
+    charge_type = price.get("charge_type")
+    if charge_type == "Por documento":
+        label = "Qtde. documentos"
+    elif charge_type == "Por fundo":
+        label = "Qtde. fundos"
+    elif charge_type == "Mensal":
+        label = "Quantidade"
+    else:
+        label = "Quantidade"
+    disabled = charge_type in {"Unico", "Percentual de sucesso", "A definir"}
+    return float(container.number_input(label, min_value=1.0, value=1.0, step=1.0, disabled=disabled, key=key))
+
+
+def _proposal_service_description_payload(item, custom_description, quantity):
+    lines = [
+        f"Servico: {item.get('service_name') or ''}",
+        f"Categoria: {item.get('service_category') or ''}",
+        f"Tipo de cobranca: {item.get('charge_type') or ''}",
+        f"Quantidade: {float(quantity or 1):g}",
+    ]
+    if item.get("pricing_rule"):
+        lines.append(f"Regra comercial: {item['pricing_rule']}")
+    if custom_description:
+        lines.append("")
+        lines.append(custom_description.strip())
+    return "\n".join(lines)
+
+
 def _export_proposal_html(proposal_id, html):
     export_dir = Path(__file__).resolve().parents[1] / "exports"
     export_dir.mkdir(exist_ok=True)
@@ -690,17 +742,42 @@ p {{ line-height:1.55; }}
 
 
 def _proposal_service_html(item):
-    description = item.get("custom_description") or item.get("full_scope") or item.get("short_description") or ""
+    name = item.get("price_service_name") or item.get("name") or _description_line(item.get("custom_description"), "Servico") or "Servico"
+    category = item.get("price_service_category") or item.get("category") or _description_line(item.get("custom_description"), "Categoria")
+    description = _clean_custom_service_description(item.get("custom_description")) or item.get("full_scope") or item.get("short_description") or item.get("price_service_description") or ""
+    rule = item.get("pricing_rule") or _description_line(item.get("custom_description"), "Regra comercial")
+    charge_type = item.get("charge_type") or _description_line(item.get("custom_description"), "Tipo de cobranca")
+    quantity = item.get("quantity") or _description_line(item.get("custom_description"), "Quantidade") or 1
     return f"""
     <article class="service">
-      <h3>{escape(str(item.get("name") or "Servico"))}</h3>
+      <h3>{escape(str(name))}</h3>
+      <p><strong>Categoria:</strong> {escape(str(category or ""))} | <strong>Cobranca:</strong> {escape(str(charge_type or ""))} | <strong>Quantidade:</strong> {escape(str(quantity))}</p>
       <p>{escape(str(description))}</p>
       <p><strong>Entregaveis:</strong> {escape(str(item.get("deliverables") or ""))}</p>
       <p><strong>Premissas:</strong> {escape(str(item.get("assumptions") or ""))}</p>
       <p><strong>Exclusoes:</strong> {escape(str(item.get("exclusions") or ""))}</p>
+      <p><strong>Regra comercial:</strong> {escape(str(rule or ""))}</p>
       <div class="price">Preco: {money(item.get("custom_price") or 0)}</div>
     </article>
     """
+
+
+def _description_line(text, label):
+    if not text:
+        return ""
+    prefix = f"{label}:"
+    for line in str(text).splitlines():
+        if line.startswith(prefix):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def _clean_custom_service_description(text):
+    if not text:
+        return ""
+    metadata = ("Servico:", "Categoria:", "Tipo de cobranca:", "Quantidade:", "Regra comercial:")
+    lines = [line for line in str(text).splitlines() if line.strip() and not line.startswith(metadata)]
+    return "\n".join(lines).strip()
 
 
 def render_followups():
