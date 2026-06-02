@@ -106,6 +106,7 @@ Esse desenho permite alterar precos no futuro sem apagar historico de servicos e
 - Documentacao CVM: R$ 500,00 por documento
 - Elaboracao/revisao de politicas e manuais: R$ 500,00 por documento
 - Cobranca extrajudicial e judicial: 30% do valor executado
+- Credenciamento CVM/ANBIMA: R$ 50.000,00, sendo 50% no aceite e 50% no deferimento
 - Item recorrente por fundo: R$ 500,00 por fundo
 - Item recorrente em sistema do contratante: R$ 500,00
 - Acrescimo com sistemas da Hoam: R$ 1.000,00
@@ -118,7 +119,7 @@ Esse desenho permite alterar precos no futuro sem apagar historico de servicos e
 - Qual item recebe o preco `R$ 500,00 por fundo`.
 - Qual item recebe o preco `R$ 500,00 utilizando sistemas do contratante + R$ 1.000,00 com sistemas Hoam`.
 - Qual item recebe a regra `minimo de R$ 1.000,00 conforme complexidade`.
-- Itens marcados como `A definir`, `Verificar com Diones` e `Verificar com Daruj`.
+- Itens marcados como `A definir` e `Verificar com Diones`.
 
 ## Evolucao no CRM
 
@@ -129,4 +130,3 @@ Primeira entrega recomendada:
 3. Atualizar `Propostas` para selecionar um servico/preco cadastrado.
 4. Manter campos manuais de valor para excecoes comerciais.
 5. Exportar proposta com os servicos escolhidos.
-

@@ -116,7 +116,7 @@ INITIAL_SERVICES = [
     ("Consultoria", "Documentos de ofertas publicas", "Elaboracao de documentos de ofertas publicas.", ""),
     ("Consultoria", "Documentos societarios", "Elaboracao de documentos societarios de fundos e investidas.", ""),
     ("Consultoria", "Documentacao CVM", "Preparacao do material para registro no Fundos.NET/CVM.", ""),
-    ("Consultoria", "Credenciamento CVM/ANBIMA", "Credenciamento de gestores e administradores de recursos de terceiros.", "Verificar com Daruj."),
+    ("Consultoria", "Credenciamento CVM/ANBIMA", "Credenciamento de gestores e administradores de recursos de terceiros.", "Preco confirmado: 50% no aceite e 50% no deferimento."),
     ("Consultoria", "Due diligence de cedentes", "Due diligence de cedentes.", "Preco a definir."),
     ("Consultoria", "Resposta a oficios", "Resposta a oficios.", "Preco a definir."),
     ("Cobranca", "Cobranca extrajudicial e judicial", "Cobranca extrajudicial e judicial.", ""),
@@ -136,7 +136,7 @@ INITIAL_PRICES = [
     ("Analise de lastro de operacoes", "A definir", 0, 0, 0, "A definir", "Validar"),
     ("Parecer tecnico-juridico", "A definir", 0, 0, 0, "Verificar com Diones", "Validar"),
     ("Due diligence e selecao de prestadores", "A definir", 0, 0, 0, "A definir", "Validar"),
-    ("Credenciamento CVM/ANBIMA", "A definir", 0, 0, 0, "Verificar com Daruj", "Validar"),
+    ("Credenciamento CVM/ANBIMA", "Unico", 50000, 0, 0, "R$ 50.000,00: 50% no aceite e 50% no deferimento.", "Ativo"),
     ("Due diligence de cedentes", "A definir", 0, 0, 0, "A definir", "Validar"),
     ("Resposta a oficios", "A definir", 0, 0, 0, "A definir", "Validar"),
 ]
