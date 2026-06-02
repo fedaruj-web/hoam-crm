@@ -1548,7 +1548,7 @@ def _render_proposal_form(leads, current_user, fixed_lead_id=None):
                 "recurring_fee": recurring_fee,
                 "estimated_total": estimated_total,
                 "valid_until": str(valid_until),
-                "sent_at": str(date.today()) if status in ["Enviada", "Em negociacao", "Aprovada"] else None,
+                "sent_at": str(date.today()) if status in ["Enviada", "Em negociacao", "Em negociação", "Aprovada"] else None,
                 "approved_at": str(date.today()) if status == "Aprovada" else None,
                 "notes": notes.strip(),
             })
@@ -1618,7 +1618,7 @@ def _render_proposal_edit_form(proposal, leads, current_user):
                 "recurring_fee": recurring_fee,
                 "estimated_total": estimated_total,
                 "valid_until": str(valid_until),
-                "sent_at": proposal.get("sent_at") or (str(date.today()) if status in ["Enviada", "Em negociacao", "Aprovada"] else None),
+                "sent_at": proposal.get("sent_at") or (str(date.today()) if status in ["Enviada", "Em negociacao", "Em negociação", "Aprovada"] else None),
                 "approved_at": proposal.get("approved_at") or (str(date.today()) if status == "Aprovada" else None),
                 "notes": notes.strip(),
                 "client_name": proposal.get("client_name"),
@@ -1661,7 +1661,7 @@ def _sync_lead_after_proposal(lead_id, proposal_status, user_id, proposal_id):
     add_activity({
         "lead_id": lead_id,
         "user_id": user_id,
-        "activity_type": "Envio de proposta" if proposal_status in ["Enviada", "Em negociacao"] else "Outro",
+        "activity_type": "Envio de proposta" if proposal_status in ["Enviada", "Em negociacao", "Em negociação"] else "Outro",
         "activity_date": str(date.today()),
         "subject": f"Proposta #{proposal_id}: {proposal_status}",
         "notes": "Movimentacao registrada pelo modulo de propostas.",

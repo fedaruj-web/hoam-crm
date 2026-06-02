@@ -397,12 +397,15 @@ def proposal_metrics(df=None):
     df = proposals_df() if df is None else df
     if df.empty:
         return {"total": 0, "sent": 0, "approved": 0, "open_value": 0, "approved_value": 0}
-    open_statuses = ["Rascunho", "Enviada", "Em negociacao", "Em negociação"]
+    status = df["status"].fillna("").str.lower()
+    negotiation = status.str.contains("negocia", na=False)
+    sent_mask = status.isin(["enviada", "aprovada"]) | negotiation
+    open_mask = status.isin(["rascunho", "enviada"]) | negotiation
     return {
         "total": len(df),
-        "sent": int(df["status"].isin(["Enviada", "Em negociacao", "Aprovada"]).sum()),
+        "sent": int(sent_mask.sum()),
         "approved": int((df["status"] == "Aprovada").sum()),
-        "open_value": float(df.loc[df["status"].isin(open_statuses), "estimated_total"].sum()),
+        "open_value": float(df.loc[open_mask, "estimated_total"].sum()),
         "approved_value": float(df.loc[df["status"] == "Aprovada", "estimated_total"].sum()),
     }
 
