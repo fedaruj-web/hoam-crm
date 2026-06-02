@@ -685,23 +685,95 @@ def _proposal_document_html(proposal, proposal_services):
 <meta charset="utf-8">
 <title>Proposta Hoam Capital</title>
 <style>
-body {{ margin:0; background:#f7f3ea; color:#171717; font-family:Arial, Helvetica, sans-serif; }}
+:root {{
+  --black:#070707;
+  --ink:#1b1711;
+  --muted:#6d6252;
+  --gold:#b99755;
+  --gold-soft:#e7d7b3;
+  --paper:#fbf7ee;
+  --card:#fffdf8;
+  --card-strong:#fff7e4;
+  --border:#dfd2b8;
+}}
+* {{ box-sizing:border-box; }}
+body {{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:Arial, Helvetica, sans-serif;
+  font-size:15px;
+}}
 .page {{ max-width:980px; margin:0 auto; padding:42px; }}
-.cover {{ background:#050505; color:#fff; border-radius:14px; padding:42px; border:1px solid #b9964d; }}
-.brand {{ color:#d5b46a; font-size:14px; letter-spacing:2px; text-transform:uppercase; font-weight:700; }}
-h1 {{ font-size:34px; line-height:1.15; margin:22px 0 28px; }}
-h2 {{ margin-top:34px; font-size:20px; color:#111; border-bottom:1px solid #d7c9a5; padding-bottom:10px; }}
-.meta {{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; margin-top:26px; }}
-.meta div, .card {{ background:#fffaf0; border:1px solid #e0d4b8; border-radius:10px; padding:16px; }}
-.label {{ color:#8b7a55; font-size:12px; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }}
-.value {{ font-weight:700; }}
-.section {{ background:#fffdf8; border:1px solid #e4dac2; border-radius:12px; padding:24px; margin-top:22px; }}
-.service {{ border-left:4px solid #b9964d; padding:16px; background:#fffaf0; margin:14px 0; border-radius:8px; }}
-.service h3 {{ margin:0 0 8px; }}
-.price {{ color:#111; font-weight:700; margin-top:10px; }}
-.signatures {{ display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:50px; }}
-.line {{ border-top:1px solid #111; padding-top:10px; text-align:center; }}
-p {{ line-height:1.55; }}
+.cover {{
+  background:var(--black);
+  color:#ffffff;
+  border-radius:14px;
+  padding:44px;
+  border:1px solid var(--gold);
+  box-shadow:0 18px 44px rgba(0,0,0,.18);
+}}
+.brand {{ color:var(--gold); font-size:13px; letter-spacing:2px; text-transform:uppercase; font-weight:700; }}
+h1 {{ color:#ffffff; font-size:34px; line-height:1.16; margin:22px 0 28px; max-width:760px; }}
+h2 {{ margin:0 0 16px; font-size:19px; color:var(--ink); border-bottom:1px solid var(--gold-soft); padding-bottom:10px; }}
+p {{ color:var(--ink); line-height:1.58; margin:0 0 12px; }}
+strong {{ color:var(--ink); }}
+.meta {{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; margin-top:24px; }}
+.info-card {{
+  background:var(--card-strong);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:15px;
+  color:var(--ink);
+}}
+.cover .info-card {{
+  background:#151515;
+  border-color:#665128;
+  color:#ffffff;
+}}
+.label {{ color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; font-weight:700; }}
+.cover .label {{ color:var(--gold-soft); }}
+.value {{ color:var(--ink); font-weight:700; overflow-wrap:anywhere; }}
+.cover .value {{ color:#ffffff; }}
+.section {{
+  background:var(--card);
+  color:var(--ink);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:26px;
+  margin-top:22px;
+  box-shadow:0 10px 28px rgba(32,25,14,.06);
+}}
+.service {{
+  color:var(--ink);
+  border-left:4px solid var(--gold);
+  padding:18px;
+  background:var(--card-strong);
+  margin:14px 0;
+  border-radius:8px;
+  border-top:1px solid #eadfca;
+  border-right:1px solid #eadfca;
+  border-bottom:1px solid #eadfca;
+}}
+.service h3 {{ color:var(--ink); margin:0 0 10px; font-size:18px; }}
+.price {{
+  display:inline-block;
+  color:var(--black);
+  background:#ead7a5;
+  border:1px solid var(--gold);
+  border-radius:999px;
+  padding:8px 12px;
+  font-weight:700;
+  margin-top:8px;
+}}
+.signatures {{ display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:54px; }}
+.line {{ color:var(--ink); border-top:1px solid var(--ink); padding-top:10px; text-align:center; }}
+@media (max-width:720px) {{
+  .page {{ padding:20px; }}
+  .cover {{ padding:28px; }}
+  .meta, .signatures {{ grid-template-columns:1fr; }}
+  h1 {{ font-size:26px; }}
+}}
 </style>
 </head>
 <body>
@@ -710,27 +782,27 @@ p {{ line-height:1.55; }}
     <div class="brand">Hoam Capital</div>
     <h1>PROPOSTA COMERCIAL E TERMO DE ADESAO A PRESTACAO DE SERVICOS</h1>
     <div class="meta">
-      <div><div class="label">Cliente</div><div class="value">{escape(client_name)}</div></div>
-      <div><div class="label">Data</div><div class="value">{escape(str(proposal_date))}</div></div>
-      <div><div class="label">Responsavel</div><div class="value">{escape(str(proposal.get("responsible") or proposal.get("owner_name") or ""))}</div></div>
-      <div><div class="label">Validade</div><div class="value">{escape(str(validity_days))} dias - ate {escape(str(valid_until))}</div></div>
+      <div class="info-card"><div class="label">Cliente</div><div class="value">{escape(client_name)}</div></div>
+      <div class="info-card"><div class="label">Data</div><div class="value">{escape(str(proposal_date))}</div></div>
+      <div class="info-card"><div class="label">Responsavel</div><div class="value">{escape(str(proposal.get("responsible") or proposal.get("owner_name") or ""))}</div></div>
+      <div class="info-card"><div class="label">Validade</div><div class="value">{escape(str(validity_days))} dias - ate {escape(str(valid_until))}</div></div>
     </div>
   </section>
 
   <section class="section">
     <h2>Dados da contratacao</h2>
     <div class="meta">
-      <div><div class="label">Documento</div><div class="value">{escape(str(proposal.get("client_document") or ""))}</div></div>
-      <div><div class="label">Contato</div><div class="value">{escape(str(proposal.get("client_contact") or ""))}</div></div>
-      <div><div class="label">E-mail</div><div class="value">{escape(str(proposal.get("client_email") or ""))}</div></div>
-      <div><div class="label">Status</div><div class="value">{escape(str(proposal.get("status") or ""))}</div></div>
+      <div class="info-card"><div class="label">Documento</div><div class="value">{escape(str(proposal.get("client_document") or ""))}</div></div>
+      <div class="info-card"><div class="label">Contato</div><div class="value">{escape(str(proposal.get("client_contact") or ""))}</div></div>
+      <div class="info-card"><div class="label">E-mail</div><div class="value">{escape(str(proposal.get("client_email") or ""))}</div></div>
+      <div class="info-card"><div class="label">Status</div><div class="value">{escape(str(proposal.get("status") or ""))}</div></div>
     </div>
   </section>
 
   <section class="section"><h2>Apresentacao da Hoam</h2><p>A Hoam Capital atua de forma estrategica na estruturacao, desenvolvimento e viabilizacao de negocios, operacoes e relacionamentos comerciais, oferecendo solucoes personalizadas alinhadas aos objetivos de seus clientes.</p><p>Com abordagem tecnica, visao de mercado e atuacao integrada, a Hoam busca conectar oportunidades, capital, ativos e parceiros estrategicos, agregando inteligencia comercial, governanca e eficiencia a execucao dos projetos.</p></section>
   <section class="section"><h2>Objetivo da proposta</h2><p>A presente proposta comercial e termo de adesao tem por objetivo apresentar as condicoes para prestacao dos servicos selecionados pelo Cliente, conforme escopo, condicoes comerciais, premissas e aceite previstos neste documento.</p></section>
   <section class="section"><h2>Servicos selecionados</h2>{services_html}</section>
-  <section class="section"><h2>Condicoes comerciais</h2><div class="meta"><div><div class="label">Fee inicial</div><div class="value">{money(proposal.get("initial_fee") or proposal.get("setup_fee") or 0)}</div></div><div><div class="label">Fee recorrente mensal</div><div class="value">{money(proposal.get("monthly_fee") or proposal.get("recurring_fee") or 0)}</div></div><div><div class="label">Success fee</div><div class="value">{float(proposal.get("success_fee") or 0):.1f}%</div></div><div><div class="label">Pagamento</div><div class="value">{escape(str(proposal.get("payment_terms") or ""))}</div></div></div><p>{escape(str(proposal.get("reimbursement_terms") or ""))}</p></section>
+  <section class="section"><h2>Condicoes comerciais</h2><div class="meta"><div class="info-card"><div class="label">Fee inicial</div><div class="value">{money(proposal.get("initial_fee") or proposal.get("setup_fee") or 0)}</div></div><div class="info-card"><div class="label">Fee recorrente mensal</div><div class="value">{money(proposal.get("monthly_fee") or proposal.get("recurring_fee") or 0)}</div></div><div class="info-card"><div class="label">Success fee</div><div class="value">{float(proposal.get("success_fee") or 0):.1f}%</div></div><div class="info-card"><div class="label">Pagamento</div><div class="value">{escape(str(proposal.get("payment_terms") or ""))}</div></div></div><p>{escape(str(proposal.get("reimbursement_terms") or ""))}</p></section>
   <section class="section"><h2>Premissas gerais</h2><p>Os servicos serao prestados de forma consultiva, estrategica, comercial e operacional, sem garantia de resultado, aprovacao regulatoria, captacao de recursos, fechamento de operacoes ou conclusao de negocios especificos.</p><p>A Hoam Capital nao assume obrigacoes financeiras, regulatorias, contabeis, fiduciarias ou de representacao legal do Cliente, salvo se expressamente pactuado em instrumento proprio.</p></section>
   <section class="section"><h2>Confidencialidade</h2><p>As informacoes compartilhadas entre as partes deverao ser tratadas de forma confidencial, nao podendo ser divulgadas a terceiros sem autorizacao previa, exceto quando exigido por lei, regulacao ou ordem de autoridade competente.</p></section>
   <section class="section"><h2>Validade</h2><p>Esta proposta e valida por {escape(str(validity_days))} dias contados da data de emissao, salvo prorrogacao formal entre as partes.</p></section>
